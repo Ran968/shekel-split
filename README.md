@@ -19,6 +19,8 @@ Your data is stored locally in your browser. Nothing is uploaded to a server.
 - Convert any currency to ILS using live daily rates (Frankfurter API), with an offline fallback
 - Multiple trips, each with its own members and expenses
 - Per-expense "paid by" and "split between"
+- Split a single payment across several payers (e.g. each pays half), with editable amounts
+- Per-person summary: how much each spent, their share, and the net they owe or get back
 - Minimal-transaction settle-up in shekels
 - Category tags, per-currency breakdown, light and dark themes
 

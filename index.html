@@ -177,6 +177,22 @@
   .pill.payer { border-color: var(--gold); background: rgba(217,154,43,.12); color: var(--gold-deep); }
   .pill.off-split { opacity: .45; }
 
+  .sc-amounts { margin-top: 11px; display: flex; flex-direction: column; gap: 7px; }
+  .pay-amt-row { display: flex; align-items: center; gap: 9px; }
+  .pay-amt-row .avatar { width: 22px; height: 22px; font-size: 10px; }
+  .pay-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pay-input { display: flex; align-items: center; gap: 5px; border: 1.5px solid var(--line); border-radius: 10px; padding: 5px 10px; background: var(--paper); direction: ltr; transition: border-color .2s, box-shadow .2s; }
+  .pay-input:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(217,154,43,.14); }
+  .pay-sym { color: var(--gold-deep); font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .pay-input input { width: 74px; border: none; background: transparent; outline: none; font-family: var(--mono); font-weight: 700; font-size: 15px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  .pay-sum { font-size: 12px; font-family: var(--mono); margin-top: 1px; text-align: left; direction: ltr; }
+  .pay-sum .ok { color: var(--teal); }
+  .pay-sum .bad { color: var(--coral); }
+
+  .who-wrap { display: flex; flex-direction: column; min-width: 0; }
+  .bal-stats { font-size: 11px; color: var(--ink-faint); margin-top: 1px; white-space: nowrap; }
+  .bal-right { flex-shrink: 0; text-align: left; }
+
   .add-btn { margin-top: 14px; width: 100%; border: none; cursor: pointer; background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%); color: #22160a; font-weight: 800; font-size: 16px; letter-spacing: .01em; padding: 14px; border-radius: 12px; transition: transform .12s, box-shadow .2s, opacity .2s; box-shadow: 0 6px 16px rgba(180,124,21,.32); }
   .add-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(180,124,21,.4); }
   .add-btn:active { transform: translateY(0); }
@@ -313,8 +329,9 @@
 
     <div class="split-config" id="splitConfig">
       <div class="sc-block">
-        <div class="sc-label">מי שילם</div>
+        <div class="sc-label">מי שילם <span class="allbtn" id="payEqualBtn" style="display:none">חלוקה שווה</span></div>
         <div class="sc-pills" id="payerPills"></div>
+        <div class="sc-amounts" id="payAmounts"></div>
       </div>
       <div class="sc-block">
         <div class="sc-label">מתחלק בין <span class="allbtn" id="splitAllBtn">כולם</span></div>
@@ -412,7 +429,7 @@
   function newTrip(name){ return { id:"t"+Date.now()+Math.floor(Math.random()*1000), name:name, members:[], expenses:[] }; }
   function activeTrip(){ return store.trips.filter(function(t){return t.id===store.active;})[0] || store.trips[0]; }
 
-  var draft = { cat:"אוכל", payer:null, split:null };
+  var draft = { cat:"אוכל", payers:null, payAmt:null, split:null };
 
   // ---------- DOM ----------
   var $ = function(id){ return document.getElementById(id); };
@@ -458,11 +475,11 @@
     store.trips.forEach(function(t){
       var c=document.createElement("button");
       c.className="trip-chip"+(t.id===store.active?" on":""); c.textContent=t.name;
-      c.onclick=function(){ if(t.id===store.active){ editTrip(t); } else { store.active=t.id; draft.payer=null; draft.split=null; persist(); renderAll(); } };
+      c.onclick=function(){ if(t.id===store.active){ editTrip(t); } else { store.active=t.id; draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); } };
       tripbar.appendChild(c);
     });
     var add=document.createElement("button"); add.className="trip-chip add"; add.textContent="+ טיול חדש";
-    add.onclick=function(){ promptModal({title:"שם הטיול", value:"", ok:"צור", onOk:function(name){ if(!name)return; var t=newTrip(name); store.trips.push(t); store.active=t.id; draft.payer=null; draft.split=null; persist(); renderAll(); }}); };
+    add.onclick=function(){ promptModal({title:"שם הטיול", value:"", ok:"צור", onOk:function(name){ if(!name)return; var t=newTrip(name); store.trips.push(t); store.active=t.id; draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); }}); };
     tripbar.appendChild(add);
   }
   function editTrip(t){
@@ -488,18 +505,40 @@
   }
   function removeMember(id){
     var t=activeTrip();
-    var used=t.expenses.some(function(e){ return e.payer===id || (e.split&&e.split.indexOf(id)>=0); });
+    var used=t.expenses.some(function(e){ return payersOf(e).some(function(p){return p.id===id;}) || (e.split&&e.split.indexOf(id)>=0); });
     if(used && !confirm("האדם הזה חלק מהוצאות קיימות. להסיר אותו בכל זאת? ההוצאות ישמרו על החלוקה המקורית.")) return;
     t.members=t.members.filter(function(m){return m.id!==id;});
-    if(draft.payer===id) draft.payer=null; draft.split=null; persist(); renderAll();
+    draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll();
   }
 
   // ---------- paid-by / split config ----------
+  function payersOf(e){
+    if(e.payers && e.payers.length) return e.payers;
+    if(e.payer!=null) return [{id:e.payer, amt:e.amount}];
+    return [];
+  }
+  function noDecCode(code){ return code==="JPY"||code==="KRW"||code==="IDR"||code==="HUF"||code==="ISK"; }
+  function roundAmt(v, code){ return noDecCode(code)? Math.round(v) : Math.round(v*100)/100; }
+  // Split `total` equally across ids (in expense currency); last one absorbs the rounding remainder.
+  function splitEqual(total, ids, code){
+    var n=ids.length, r={}, acc=0, each=total/n;
+    ids.forEach(function(id,i){ if(i<n-1){ var val=roundAmt(each,code); r[id]=val; acc+=val; } else { r[id]=roundAmt(total-acc,code); } });
+    return r;
+  }
+  // Amount each selected payer contributes (equal by default, or custom when the user has edited).
+  function payerAmounts(total, code){
+    var ps=draft.payers||[];
+    if(!ps.length) return {};
+    if(draft.payAmt){ var m={}; ps.forEach(function(id){ m[id]=+(draft.payAmt[id]||0); }); return m; }
+    return splitEqual(total, ps, code);
+  }
   function ensureDraftDefaults(){
     var t=activeTrip();
     var ids=t.members.map(function(m){return m.id;});
-    if(draft.payer && ids.indexOf(draft.payer)<0) draft.payer=null;
-    if(!draft.payer && ids.length) draft.payer=ids[0];
+    if(draft.payers===null) draft.payers = ids.length?[ids[0]]:[];
+    else draft.payers = draft.payers.filter(function(id){return ids.indexOf(id)>=0;});
+    if(!draft.payers.length && ids.length) draft.payers=[ids[0]];
+    if(draft.payAmt){ var keep={}; draft.payers.forEach(function(id){ keep[id]=draft.payAmt[id]; }); draft.payAmt=keep; }
     if(draft.split===null) draft.split = ids.slice();
     else draft.split = draft.split.filter(function(id){return ids.indexOf(id)>=0;});
   }
@@ -510,12 +549,18 @@
     ensureDraftDefaults();
     payerPills.innerHTML="";
     t.members.forEach(function(m){
+      var on=draft.payers.indexOf(m.id)>=0;
       var p=document.createElement("button"); p.type="button";
-      p.className="pill"+(draft.payer===m.id?" payer":"");
+      p.className="pill"+(on?" payer":" off-split");
       p.innerHTML='<span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span>'+esc(m.name);
-      p.onclick=function(){ draft.payer=m.id; renderSplitConfig(); };
+      p.onclick=function(){
+        if(on){ if(draft.payers.length>1) draft.payers=draft.payers.filter(function(x){return x!==m.id;}); }
+        else { draft.payers.push(m.id); }
+        draft.payAmt=null; renderSplitConfig();
+      };
       payerPills.appendChild(p);
     });
+    renderPayAmounts();
     splitPills.innerHTML="";
     t.members.forEach(function(m){
       var on=draft.split.indexOf(m.id)>=0;
@@ -527,6 +572,59 @@
     });
   }
   $("splitAllBtn").onclick=function(){ var t=activeTrip(); draft.split=t.members.map(function(m){return m.id;}); renderSplitConfig(); };
+  $("payEqualBtn").onclick=function(){ draft.payAmt=null; renderSplitConfig(); };
+
+  function fmtInput(v, code){ v=+v||0; return noDecCode(code)? String(Math.round(v)) : (Math.round(v*100)/100).toFixed(2); }
+  function renderPayAmounts(){
+    var t=activeTrip();
+    var box=$("payAmounts"), eqBtn=$("payEqualBtn");
+    var ps=draft.payers||[];
+    if(ps.length<2){ box.innerHTML=""; box.style.display="none"; eqBtn.style.display="none"; return; }
+    box.style.display="block"; eqBtn.style.display="inline";
+    var total=parseFloat(amtInput.value)||0;
+    var amounts=payerAmounts(total, store.currency);
+    var sym=CUR[store.currency]?CUR[store.currency].s:"";
+    box.innerHTML="";
+    ps.forEach(function(id){
+      var m=memberById(t,id);
+      var row=document.createElement("div"); row.className="pay-amt-row";
+      row.innerHTML='<span class="avatar" style="background:'+avatarColor(t,id)+'">'+esc(initials(m.name))+'</span>'+
+        '<span class="pay-name">'+esc(m.name)+'</span>'+
+        '<span class="pay-input"><span class="pay-sym">'+sym+'</span><input type="text" inputmode="decimal" data-id="'+id+'" value="'+fmtInput(amounts[id],store.currency)+'"></span>';
+      box.appendChild(row);
+    });
+    var ind=document.createElement("div"); ind.className="pay-sum"; box.appendChild(ind);
+    updatePaySum(amounts);
+    Array.prototype.forEach.call(box.querySelectorAll('input[data-id]'), function(inp){
+      inp.oninput=function(){
+        inp.value=inp.value.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1");
+        onPayEdit(inp.getAttribute('data-id'), parseFloat(inp.value)||0);
+      };
+    });
+  }
+  function updatePaySum(amounts){
+    var box=$("payAmounts"), ind=box.querySelector('.pay-sum'); if(!ind) return;
+    var total=parseFloat(amtInput.value)||0, sym=CUR[store.currency]?CUR[store.currency].s:"";
+    var sum=0; (draft.payers||[]).forEach(function(id){ sum+=amounts[id]||0; });
+    var diff=roundAmt(total-sum, store.currency);
+    if(Math.abs(diff) < (noDecCode(store.currency)?0.5:0.005)) ind.innerHTML='<span class="ok">מסתכם ל־'+sym+fmtInput(total,store.currency)+'</span>';
+    else if(diff>0) ind.innerHTML='<span class="bad">חסר '+sym+fmtInput(diff,store.currency)+'</span>';
+    else ind.innerHTML='<span class="bad">עודף '+sym+fmtInput(-diff,store.currency)+'</span>';
+  }
+  function onPayEdit(editId, val){
+    var total=parseFloat(amtInput.value)||0, ps=(draft.payers||[]).slice();
+    val=Math.max(0, Math.min(val, total));
+    var others=ps.filter(function(id){return id!==editId;});
+    var m={}; m[editId]=roundAmt(val, store.currency);
+    var eq=splitEqual(Math.max(0,total-m[editId]), others, store.currency);
+    others.forEach(function(id){ m[id]=eq[id]||0; });
+    draft.payAmt=m;
+    var box=$("payAmounts");
+    Array.prototype.forEach.call(box.querySelectorAll('input[data-id]'), function(inp){
+      var id=inp.getAttribute('data-id'); if(id!==editId) inp.value=fmtInput(m[id],store.currency);
+    });
+    updatePaySum(m);
+  }
 
   // ---------- categories ----------
   CATS.forEach(function(cat){
@@ -564,7 +662,7 @@
     if(store.currency==="ILS"){ convHint.innerHTML="כבר ב<b>שקלים</b>"; return; }
     convHint.innerHTML='<span dir="ltr">'+fmtCompact(store.currency,v)+" "+store.currency+" → <b>₪"+fmt(toILS(v,store.currency))+"</b></span>";
   }
-  amtInput.oninput=function(){ amtInput.value=amtInput.value.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1"); updateHint(); addBtn.disabled=!(parseFloat(amtInput.value)>0); };
+  amtInput.oninput=function(){ amtInput.value=amtInput.value.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1"); updateHint(); addBtn.disabled=!(parseFloat(amtInput.value)>0); if(draft.payers && draft.payers.length>1){ draft.payAmt=null; renderPayAmounts(); } };
   amtInput.onkeydown=function(e){ if(e.key==="Enter") addExpense(); };
   descInput.onkeydown=function(e){ if(e.key==="Enter") addExpense(); };
 
@@ -572,11 +670,23 @@
   function addExpense(){
     var v=parseFloat(amtInput.value); if(!(v>0)){ amtInput.focus(); return; }
     var t=activeTrip();
-    var payer=null, split=[];
-    if(t.members.length){ ensureDraftDefaults(); payer=draft.payer; split=draft.split.slice(); if(!split.length) split=t.members.map(function(m){return m.id;}); }
-    t.expenses.push({ id:Date.now(), amount:v, code:store.currency, desc:descInput.value.trim(), cat:draft.cat, payer:payer, split:split });
+    var payers=[], split=[];
+    if(t.members.length){
+      ensureDraftDefaults();
+      split=draft.split.slice(); if(!split.length) split=t.members.map(function(m){return m.id;});
+      var amounts=payerAmounts(v, store.currency);
+      var sum=0; draft.payers.forEach(function(id){ sum+=amounts[id]||0; });
+      var tol=noDecCode(store.currency)?0.5:0.02;
+      if(draft.payers.length>1 && Math.abs(sum-v)>tol){
+        var sym=CUR[store.currency]?CUR[store.currency].s:"";
+        alert("סכום התשלומים ("+sym+fmtInput(sum,store.currency)+") לא שווה לסכום ההוצאה ("+sym+fmtInput(v,store.currency)+"). תקנו את הסכומים או לחצו \"חלוקה שווה\".");
+        return;
+      }
+      payers=draft.payers.map(function(id){ return {id:id, amt:amounts[id]||0}; });
+    }
+    t.expenses.push({ id:Date.now(), amount:v, code:store.currency, desc:descInput.value.trim(), cat:draft.cat, payers:payers, split:split });
     persist();
-    amtInput.value=""; descInput.value=""; convHint.textContent=""; addBtn.disabled=true;
+    amtInput.value=""; descInput.value=""; convHint.textContent=""; addBtn.disabled=true; draft.payAmt=null;
     renderAll(); amtInput.focus();
   }
   addBtn.onclick=addExpense; addBtn.disabled=true;
@@ -584,18 +694,20 @@
   $("clearBtn").onclick=function(){ var t=activeTrip(); if(!t.expenses.length)return; if(confirm("לנקות את כל ההוצאות ב\""+t.name+"\"? לא ניתן לבטל.")){ t.expenses=[]; persist(); renderAll(); } };
 
   // ---------- balances / settle up ----------
-  function computeBalances(t){
-    var bal={}; t.members.forEach(function(m){ bal[m.id]=0; });
+  function computeSummary(t){
+    var bal={}, paid={}, share={};
+    t.members.forEach(function(m){ bal[m.id]=0; paid[m.id]=0; share[m.id]=0; });
     t.expenses.forEach(function(e){
-      if(e.payer==null || !e.split || !e.split.length) return;
-      var ils=toILS(e.amount,e.code);
-      if(bal[e.payer]!=null) bal[e.payer]+=ils;
+      var ps=payersOf(e);
+      if(!ps.length || !e.split || !e.split.length) return;
+      var totalILS=toILS(e.amount,e.code);
+      ps.forEach(function(p){ if(bal[p.id]!=null){ var a=toILS(p.amt,e.code); bal[p.id]+=a; paid[p.id]+=a; } });
       var valid=e.split.filter(function(id){return bal[id]!=null;});
       if(!valid.length) return;
-      var share=ils/valid.length;
-      valid.forEach(function(id){ bal[id]-=share; });
+      var sh=totalILS/valid.length;
+      valid.forEach(function(id){ bal[id]-=sh; share[id]+=sh; });
     });
-    return bal;
+    return { bal:bal, paid:paid, share:share };
   }
   function settleUp(bal){
     var debt=[], cred=[];
@@ -612,16 +724,18 @@
   }
   function renderSettle(){
     var t=activeTrip();
-    if(t.members.length<1 || !t.expenses.some(function(e){return e.payer!=null;})){ settle.innerHTML=""; return; }
-    var bal=computeBalances(t);
+    if(t.members.length<1 || !t.expenses.some(function(e){return payersOf(e).length>0;})){ settle.innerHTML=""; return; }
+    var sum=computeSummary(t), bal=sum.bal;
     var transfers=settleUp(bal);
-    var html='<div class="list-head" style="margin:0 4px 12px"><h2>יישוב חשבונות</h2></div><div class="settle-inner">';
+    var html='<div class="list-head" style="margin:0 4px 12px"><h2>סיכום ויישוב</h2></div><div class="settle-inner">';
     t.members.forEach(function(m){
       var v=Math.round((bal[m.id]||0)*100)/100;
       var cls=v>0.005?"pos":(v<-0.005?"neg":"zero");
       var label=v>0.005?"מקבל בחזרה":(v<-0.005?"חייב":"מסודר");
-      html+='<div class="bal-row"><div class="bal-name"><span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span><span class="who">'+esc(m.name)+'</span></div>'+
-            '<div><div class="bal-net '+cls+'">'+(v>0.005?"+":"")+"₪"+fmt(v)+'</div><div class="bal-sub" style="text-align:left">'+label+'</div></div></div>';
+      html+='<div class="bal-row"><div class="bal-name"><span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span>'+
+            '<span class="who-wrap"><span class="who">'+esc(m.name)+'</span>'+
+            '<span class="bal-stats">שילם ₪'+fmt(sum.paid[m.id]||0)+' · חלקו ₪'+fmt(sum.share[m.id]||0)+'</span></span></div>'+
+            '<div class="bal-right"><div class="bal-net '+cls+'">'+(v>0.005?"+":"")+"₪"+fmt(v)+'</div><div class="bal-sub">'+label+'</div></div></div>';
     });
     html+='</div>';
     if(transfers.length){
@@ -659,7 +773,13 @@
         var el=document.createElement("div"); el.className="expense"; el.dataset.id=e.id;
         var ils=toILS(e.amount,e.code);
         var paidTxt="";
-        if(e.payer!=null){ var pm=memberById(t,e.payer); var n=e.split?e.split.length:0; paidTxt='<span class="paid">שולם ע״י '+(pm?esc(pm.name):"—")+(n?' · מתחלק ל־'+n:'')+'</span>'; }
+        var ps=payersOf(e);
+        if(ps.length){
+          var n=e.split?e.split.length:0, payTxt;
+          if(ps.length===1){ var pm=memberById(t,ps[0].id); payTxt='שולם ע״י '+(pm?esc(pm.name):"—"); }
+          else { payTxt='שילמו '+ps.map(function(p){ var m2=memberById(t,p.id); return (m2?esc(m2.name):"—")+' '+(CUR[e.code]?CUR[e.code].s:"")+fmtCompact(e.code,p.amt); }).join(' · '); }
+          paidTxt='<span class="paid">'+payTxt+(n?' · חלוקה '+n:'')+'</span>';
+        }
         el.innerHTML='<div class="ex-badge">'+e.code+'</div>'+
           '<div class="ex-main"><div class="ex-desc">'+esc(e.desc||(CUR[e.code]?CUR[e.code].n:e.code))+'</div>'+
           '<div class="ex-meta"><span class="tag">'+esc(e.cat||"אחר")+'</span>'+paidTxt+'<span>'+dateLabel(e.id)+'</span></div></div>'+
