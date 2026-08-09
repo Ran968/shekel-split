@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<title>שקל — דלפק ההמרה</title>
+<style>
+  :root {
+    --paper: #f3efe6;
+    --paper-2: #ece6d8;
+    --card: #ffffff;
+    --ink: #16202b;
+    --ink-soft: #47535f;
+    --ink-faint: #8a94a0;
+    --line: #e2dccc;
+    --gold: #d99a2b;
+    --gold-deep: #b47c15;
+    --teal: #0f7a6c;
+    --coral: #d5604e;
+    --board-bg: #141d27;
+    --board-ink: #f4ede0;
+    --board-cell: #1f2a36;
+    --board-line: #2b3946;
+    --shadow: 0 1px 2px rgba(20,29,39,.06), 0 8px 24px rgba(20,29,39,.06);
+    --shadow-lg: 0 2px 4px rgba(20,29,39,.08), 0 20px 50px rgba(20,29,39,.14);
+    --radius: 16px;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "Cascadia Mono", "Roboto Mono", monospace;
+    --sans: "Rubik", "Assistant", "Heebo", system-ui, -apple-system, "Arial Hebrew", "Segoe UI", Arial, sans-serif;
+  }
+  [data-theme="dark"] {
+    --paper: #10161d;
+    --paper-2: #0b1015;
+    --card: #18212b;
+    --ink: #eef2f6;
+    --ink-soft: #aeb8c2;
+    --ink-faint: #6c7885;
+    --line: #263039;
+    --gold: #e5ad4b;
+    --gold-deep: #cf992f;
+    --teal: #34b3a1;
+    --coral: #e07a68;
+    --board-bg: #0a0f14;
+    --board-ink: #f4ede0;
+    --board-cell: #161f29;
+    --board-line: #26313c;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --shadow-lg: 0 2px 4px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.5;
+    min-height: 100vh;
+    transition: background .4s ease, color .4s ease;
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, rgba(217,154,43,.10), transparent 60%),
+      radial-gradient(900px 500px at 110% 110%, rgba(15,122,108,.08), transparent 55%);
+  }
+  ::selection { background: var(--gold); color: #16202b; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 22px 18px 90px; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; margin-bottom: 18px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand h1 { font-size: 27px; font-weight: 800; letter-spacing: -.02em; direction: ltr; }
+  .brand .dot { color: var(--gold); }
+  .brand small {
+    font-size: 12px; letter-spacing: .06em;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  .toolbtn {
+    appearance: none; border: 1px solid var(--line); background: var(--card);
+    color: var(--ink-soft); width: 40px; height: 40px; border-radius: 11px;
+    cursor: pointer; display: grid; place-items: center; font-size: 16px;
+    transition: transform .15s ease, border-color .2s, color .2s;
+    box-shadow: var(--shadow);
+  }
+  .toolbtn:hover { transform: translateY(-1px); border-color: var(--gold); color: var(--gold-deep); }
+  .toolbtn:active { transform: translateY(0); }
+
+  /* ---------- trip bar ---------- */
+  .tripbar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; scrollbar-width: none; }
+  .tripbar::-webkit-scrollbar { display: none; }
+  .trip-chip {
+    flex-shrink: 0; border: 1.5px solid var(--line); background: var(--card);
+    color: var(--ink-soft); border-radius: 999px; padding: 8px 15px; font-size: 14px;
+    font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; box-shadow: var(--shadow);
+  }
+  .trip-chip:hover { border-color: var(--gold); }
+  .trip-chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .trip-chip.add { color: var(--gold-deep); border-style: dashed; font-weight: 700; }
+
+  /* ---------- the board (signature) ---------- */
+  .board {
+    background: var(--board-bg); border-radius: 22px; padding: 24px 24px 20px;
+    color: var(--board-ink); box-shadow: var(--shadow-lg); position: relative;
+    overflow: hidden; border: 1px solid rgba(255,255,255,.05);
+  }
+  .board::before {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(180deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px);
+    pointer-events: none;
+  }
+  .board-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; position: relative; }
+  .board-label { font-size: 13px; letter-spacing: .02em; color: #97a4b1; font-weight: 700; }
+  .board-label b { color: #d7cfbf; font-size: 14px; margin-right: 6px; }
+  .rate-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+    color: #97a4b1; border: 1px solid var(--board-line); border-radius: 999px;
+    padding: 4px 9px; background: rgba(255,255,255,.02);
+  }
+  .rate-pill .led { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); animation: pulse 2s infinite; }
+  .rate-pill.stale .led { background: var(--gold); box-shadow: 0 0 8px var(--gold); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .total { font-family: var(--mono); font-weight: 700; letter-spacing: -.02em; line-height: 1; display: flex; align-items: baseline; gap: .12em; margin: 6px 0 2px; }
+  .total .shk { font-size: clamp(30px, 8vw, 46px); color: var(--gold); font-weight: 800; }
+  .total .amt { font-size: clamp(40px, 13vw, 74px); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .board-sub { display: flex; gap: 18px; flex-wrap: wrap; color: #8b98a5; font-size: 13px; position: relative; margin-top: 6px; }
+  .board-sub b { color: #d7cfbf; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* ---------- members ---------- */
+  .members { margin-top: 16px; }
+  .members-head { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 8px; }
+  .members-head h2 { font-size: 13px; letter-spacing: .02em; color: var(--ink-faint); font-weight: 700; }
+  .member-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .mchip { display: flex; align-items: center; gap: 7px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 5px 5px 6px; box-shadow: var(--shadow); font-size: 14px; font-weight: 600; }
+  .avatar { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0; direction: ltr; }
+  .mchip .mdel { border: none; background: none; color: var(--ink-faint); cursor: pointer; font-size: 13px; padding: 0 3px; line-height: 1; }
+  .mchip .mdel:hover { color: var(--coral); }
+  .mchip.add-m { cursor: pointer; color: var(--gold-deep); border-style: dashed; padding: 7px 14px; font-weight: 700; }
+  .mchip.add-m:hover { border-color: var(--gold); }
+
+  /* ---------- add form ---------- */
+  .composer { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-top: 18px; box-shadow: var(--shadow); }
+  .row { display: flex; gap: 10px; }
+  .amount-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); border-radius: 12px; padding: 4px 14px 4px 6px; background: var(--paper); transition: border-color .2s, box-shadow .2s; }
+  .amount-field:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(217,154,43,.16); }
+  .amount-field input { flex: 1; min-width: 0; border: none; background: transparent; outline: none; font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; direction: ltr; text-align: right; }
+  .amount-field input::placeholder { color: var(--ink-faint); font-weight: 600; }
+  .cur-btn { flex-shrink: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; border: 1.5px solid var(--line); background: var(--paper); border-radius: 12px; padding: 10px 13px; transition: transform .12s, border-color .2s, background .2s; direction: ltr; }
+  .cur-btn:hover { transform: translateY(-1px); border-color: var(--gold); background: var(--card); }
+  .cur-btn .code { font-weight: 800; font-size: 15px; letter-spacing: .02em; color: var(--ink); }
+  .cur-btn .sym { color: var(--gold-deep); font-weight: 700; font-family: var(--mono); }
+  .cur-btn .chev { color: var(--gold-deep); font-size: 11px; }
+
+  .desc-row { margin-top: 10px; }
+  .desc-row input { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 15px; font-family: var(--sans); background: var(--paper); color: var(--ink); outline: none; transition: border-color .2s, box-shadow .2s; }
+  .desc-row input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(217,154,43,.16); }
+
+  .cats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+  .cat { border: 1.5px solid var(--line); background: var(--paper); color: var(--ink-soft); border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .cat:hover { border-color: var(--gold); color: var(--ink); }
+  .cat.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* paid-by / split rows */
+  .split-config { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .sc-block { margin-bottom: 12px; }
+  .sc-block:last-child { margin-bottom: 0; }
+  .sc-label { font-size: 13px; letter-spacing: .02em; color: var(--ink-faint); font-weight: 700; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; }
+  .sc-label .allbtn { font-size: 13px; color: var(--gold-deep); cursor: pointer; font-weight: 600; }
+  .sc-pills { display: flex; gap: 7px; flex-wrap: wrap; }
+  .pill { display: flex; align-items: center; gap: 7px; border: 1.5px solid var(--line); background: var(--paper); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink-soft); transition: all .15s; }
+  .pill .avatar { width: 20px; height: 20px; font-size: 10px; }
+  .pill.on { border-color: var(--ink); color: var(--ink); background: var(--card); }
+  .pill.payer { border-color: var(--gold); background: rgba(217,154,43,.12); color: var(--gold-deep); }
+  .pill.off-split { opacity: .45; }
+
+  .add-btn { margin-top: 14px; width: 100%; border: none; cursor: pointer; background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%); color: #22160a; font-weight: 800; font-size: 16px; letter-spacing: .01em; padding: 14px; border-radius: 12px; transition: transform .12s, box-shadow .2s, opacity .2s; box-shadow: 0 6px 16px rgba(180,124,21,.32); }
+  .add-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(180,124,21,.4); }
+  .add-btn:active { transform: translateY(0); }
+  .add-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .conv-hint { text-align: center; margin-top: 10px; font-size: 13px; color: var(--ink-faint); font-family: var(--mono); min-height: 18px; }
+  .conv-hint b { color: var(--teal); font-weight: 700; }
+
+  /* ---------- settle up ---------- */
+  .settle { margin-top: 26px; }
+  .settle-inner { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .bal-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .bal-row:last-child { border-bottom: none; }
+  .bal-name { flex: 1; font-weight: 600; font-size: 15px; display:flex; align-items:center; gap:9px; min-width:0; }
+  .bal-name .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bal-sub { font-size: 11px; color: var(--ink-faint); font-family: var(--sans); }
+  .bal-net { font-family: var(--mono); font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; text-align:left; direction: ltr; }
+  .bal-net.pos { color: var(--teal); }
+  .bal-net.neg { color: var(--coral); }
+  .bal-net.zero { color: var(--ink-faint); }
+  .transfers { padding: 4px; }
+  .transfer { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 11px; font-size: 14px; }
+  .transfer + .transfer { margin-top: 2px; }
+  .transfer .tarrow { color: var(--ink-faint); font-weight: 600; font-size: 13px; }
+  .transfer .tname { font-weight: 700; }
+  .transfer .tamt { margin-inline-start: auto; font-family: var(--mono); font-weight: 800; color: var(--gold-deep); font-variant-numeric: tabular-nums; direction: ltr; }
+  .settle-done { text-align: center; padding: 16px; color: var(--teal); font-weight: 600; font-size: 14px; }
+
+  /* ---------- list ---------- */
+  .list-head { display: flex; align-items: center; justify-content: space-between; margin: 30px 4px 12px; }
+  .list-head h2 { font-size: 14px; letter-spacing: .02em; color: var(--ink-faint); font-weight: 700; }
+  .list-head button { border: none; background: none; color: var(--ink-faint); font-size: 12px; cursor: pointer; font-weight: 600; padding: 4px 8px; border-radius: 8px; transition: color .15s, background .15s; }
+  .list-head button:hover { color: var(--coral); background: rgba(213,96,78,.1); }
+
+  .expense { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px; margin-bottom: 9px; box-shadow: var(--shadow); animation: slideIn .35s cubic-bezier(.2,.8,.2,1); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+  .expense.removing { animation: slideOut .3s ease forwards; }
+  @keyframes slideOut { to { opacity: 0; transform: translateX(-30px); height: 0; padding-top:0; padding-bottom:0; margin-bottom:0; } }
+  .ex-badge { width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; font-weight: 800; font-size: 12px; background: var(--paper-2); color: var(--ink-soft); letter-spacing: .02em; font-family: var(--mono); }
+  .ex-main { flex: 1; min-width: 0; }
+  .ex-desc { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ex-meta { font-size: 12px; color: var(--ink-faint); display: flex; gap: 7px; align-items: center; margin-top: 1px; flex-wrap:wrap; }
+  .ex-meta .tag { background: var(--paper-2); padding: 1px 7px; border-radius: 6px; font-weight: 600; }
+  .ex-meta .paid { color: var(--gold-deep); font-weight: 600; }
+  .ex-amt { text-align: left; flex-shrink: 0; direction: ltr; }
+  .ex-ils { font-family: var(--mono); font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .ex-orig { font-size: 12px; color: var(--ink-faint); font-family: var(--mono); }
+  .ex-del { border: none; background: none; color: var(--ink-faint); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; font-size: 15px; transition: color .15s, background .15s; display: grid; place-items: center; }
+  .ex-del:hover { color: var(--coral); background: rgba(213,96,78,.12); }
+  .empty { text-align: center; padding: 40px 20px; color: var(--ink-faint); border: 1.5px dashed var(--line); border-radius: 14px; background: var(--card); }
+  .empty .big { font-size: 30px; font-family: var(--mono); color: var(--gold); font-weight: 800; margin-bottom: 6px; direction: ltr; }
+  .empty p { font-size: 14px; }
+
+  /* breakdown */
+  .breakdown { margin-top: 24px; }
+  .bd-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .bd-code { width: 46px; font-weight: 800; font-family: var(--mono); font-size: 12px; direction: ltr; }
+  .bd-bar-wrap { flex: 1; height: 8px; background: var(--paper-2); border-radius: 999px; overflow: hidden; }
+  .bd-bar { height: 100%; background: linear-gradient(90deg, var(--teal), var(--gold)); border-radius: 999px; transition: width .5s cubic-bezier(.2,.8,.2,1); }
+  .bd-val { width: 92px; text-align: left; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-soft); font-weight: 600; direction: ltr; }
+
+  /* ---------- modal ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(16,22,29,.5); backdrop-filter: blur(4px); display: none; z-index: 50; align-items: flex-end; justify-content: center; }
+  .modal-bg.open { display: flex; animation: fade .2s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .modal { background: var(--card); width: 100%; max-width: 480px; border-radius: 20px 20px 0 0; max-height: 78vh; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); animation: up .28s cubic-bezier(.2,.85,.25,1); }
+  @media (min-width: 520px){ .modal-bg { align-items: center; } .modal { border-radius: 20px; } }
+  @keyframes up { from { transform: translateY(30px); opacity:.6; } to { transform: none; opacity: 1; } }
+  .modal-head { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); }
+  .modal-head h3 { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
+  .modal-head input { width: 100%; border: 1.5px solid var(--line); border-radius: 11px; padding: 11px 13px; font-size: 15px; background: var(--paper); color: var(--ink); outline: none; }
+  .modal-head input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(217,154,43,.16); }
+  .cur-list { overflow-y: auto; padding: 8px; }
+  .cur-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 11px; cursor: pointer; transition: background .12s; }
+  .cur-item:hover, .cur-item.hl { background: var(--paper); }
+  .cur-item .ci-code { font-weight: 800; font-family: var(--mono); width: 44px; font-size: 14px; direction: ltr; }
+  .cur-item .ci-sym { color: var(--gold-deep); font-family: var(--mono); font-weight: 700; width: 24px; text-align: center; }
+  .cur-item .ci-name { flex: 1; color: var(--ink-soft); font-size: 14px; }
+  .cur-item .ci-rate { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); direction: ltr; }
+  .cur-item.sel { background: var(--paper-2); }
+  .modal-actions { padding: 14px 18px; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+  .modal-actions button { flex: 1; padding: 12px; border-radius: 11px; font-size: 15px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink-soft); }
+  .modal-actions button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .modal-actions button.danger { color: var(--coral); border-color: rgba(213,96,78,.4); }
+
+  .foot { text-align: center; margin-top: 34px; font-size: 12px; color: var(--ink-faint); }
+  .foot a { color: var(--gold-deep); text-decoration: none; font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>Shékel<span class="dot">.</span></h1>
+      <small>דלפק ההמרה</small>
+    </div>
+    <button class="toolbtn" id="themeBtn" title="מצב בהיר / כהה" aria-label="החלפת ערכת נושא">◐</button>
+  </header>
+
+  <div class="tripbar" id="tripbar"></div>
+
+  <!-- BOARD -->
+  <section class="board" aria-live="polite">
+    <div class="board-top">
+      <span class="board-label">סך הטיול<b id="tripName">—</b></span>
+      <span class="rate-pill" id="ratePill"><span class="led"></span><span id="rateText">טוען שערים…</span></span>
+    </div>
+    <div class="total"><span class="shk">₪</span><span class="amt" id="totalAmt">0<span style="opacity:.55">.00</span></span></div>
+    <div class="board-sub">
+      <span><b id="cntEntries">0</b> רשומות</span>
+      <span><b id="cntPeople">0</b> אנשים</span>
+      <span>לכל אחד: <b id="perHead">₪0.00</b></span>
+    </div>
+
+    <!-- members -->
+    <div class="members">
+      <div class="members-head"><h2>מי בטיול</h2></div>
+      <div class="member-chips" id="memberChips"></div>
+    </div>
+  </section>
+
+  <!-- COMPOSER -->
+  <section class="composer">
+    <div class="row">
+      <label class="amount-field"><input id="amtInput" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off" /></label>
+      <button class="cur-btn" id="curBtn" aria-haspopup="dialog">
+        <span class="sym" id="curSym">¥</span><span class="code" id="curCode">JPY</span><span class="chev">▾</span>
+      </button>
+    </div>
+    <div class="desc-row"><input id="descInput" type="text" placeholder="על מה זה היה?  (למשל ארוחת ערב בסופיה)" autocomplete="off" maxlength="60" /></div>
+    <div class="cats" id="cats"></div>
+
+    <div class="split-config" id="splitConfig">
+      <div class="sc-block">
+        <div class="sc-label">מי שילם</div>
+        <div class="sc-pills" id="payerPills"></div>
+      </div>
+      <div class="sc-block">
+        <div class="sc-label">מתחלק בין <span class="allbtn" id="splitAllBtn">כולם</span></div>
+        <div class="sc-pills" id="splitPills"></div>
+      </div>
+    </div>
+
+    <button class="add-btn" id="addBtn">הוסף לדלפק</button>
+    <div class="conv-hint" id="convHint"></div>
+  </section>
+
+  <!-- SETTLE UP -->
+  <div class="settle" id="settle"></div>
+
+  <!-- LIST -->
+  <div class="list-head">
+    <h2>יומן</h2>
+    <button id="clearBtn">נקה יומן</button>
+  </div>
+  <div id="list"></div>
+
+  <div class="breakdown" id="breakdown"></div>
+
+  <p class="foot">שערים מ־<a href="https://www.frankfurter.app" target="_blank" rel="noopener">Frankfurter</a> · הכול מיושב ב־₪ · הנתונים נשמרים במכשיר שלך</p>
+</div>
+
+<!-- CURRENCY MODAL -->
+<div class="modal-bg" id="curModalBg">
+  <div class="modal" role="dialog" aria-label="בחירת מטבע">
+    <div class="modal-head">
+      <h3>בחירת מטבע</h3>
+      <input id="curSearch" type="text" placeholder="חיפוש — קוד, שם או סמל" autocomplete="off" />
+    </div>
+    <div class="cur-list" id="curList"></div>
+  </div>
+</div>
+
+<!-- PROMPT MODAL (trip / member names) -->
+<div class="modal-bg" id="promptModalBg">
+  <div class="modal" role="dialog" aria-label="קלט">
+    <div class="modal-head"><h3 id="promptTitle">הוספה</h3><input id="promptInput" type="text" autocomplete="off" maxlength="40" /></div>
+    <div class="modal-actions">
+      <button id="promptCancel">ביטול</button>
+      <button id="promptDelete" class="danger" style="display:none">מחק טיול</button>
+      <button id="promptOk" class="primary">שמור</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CUR = {
+    ILS:{n:"שקל חדש",s:"₪"}, USD:{n:"דולר אמריקאי",s:"$"}, EUR:{n:"אירו",s:"€"},
+    GBP:{n:"לירה שטרלינג",s:"£"}, JPY:{n:"ין יפני",s:"¥"}, BGN:{n:"לב בולגרי",s:"лв"},
+    CHF:{n:"פרנק שוויצרי",s:"Fr"}, CAD:{n:"דולר קנדי",s:"$"}, AUD:{n:"דולר אוסטרלי",s:"$"},
+    CNY:{n:"יואן סיני",s:"¥"}, INR:{n:"רופי הודי",s:"₹"}, SEK:{n:"כתר שוודי",s:"kr"},
+    NOK:{n:"כתר נורווגי",s:"kr"}, DKK:{n:"כתר דני",s:"kr"}, PLN:{n:"זלוטי פולני",s:"zł"},
+    CZK:{n:"קורונה צ׳כית",s:"Kč"}, HUF:{n:"פורינט הונגרי",s:"Ft"}, RON:{n:"לאו רומני",s:"lei"},
+    TRY:{n:"לירה טורקית",s:"₺"}, ZAR:{n:"ראנד דרום־אפריקאי",s:"R"}, BRL:{n:"ריאל ברזילאי",s:"R$"},
+    MXN:{n:"פזו מקסיקני",s:"$"}, SGD:{n:"דולר סינגפורי",s:"$"}, HKD:{n:"דולר הונג־קונגי",s:"$"},
+    KRW:{n:"וון דרום־קוריאני",s:"₩"}, NZD:{n:"דולר ניו־זילנדי",s:"$"}, THB:{n:"באט תאילנדי",s:"฿"},
+    MYR:{n:"רינגיט מלזי",s:"RM"}, IDR:{n:"רופיה אינדונזית",s:"Rp"}, PHP:{n:"פזו פיליפיני",s:"₱"},
+    ISK:{n:"כתר איסלנדי",s:"kr"}
+  };
+  // ILS per 1 unit of currency. Baked from live rates on 2026-08-07; overridden by live fetch when online.
+  // BGN is pegged to EUR (1.95583) — no longer on the live feed after euro adoption, so it stays static.
+  var FALLBACK = {
+    ILS:1, USD:3.003, EUR:3.464, GBP:4.039, JPY:0.01897, BGN:1.771, CHF:3.706, CAD:2.143, AUD:2.114,
+    CNY:0.4450, INR:0.03154, SEK:0.3165, NOK:0.3156, DKK:0.4634, PLN:0.8059, CZK:0.1428, HUF:0.009503,
+    RON:0.6595, TRY:0.06295, ZAR:0.1851, BRL:0.5888, MXN:0.1750, SGD:2.344, HKD:0.3828, KRW:0.002121,
+    NZD:1.763, THB:0.09084, MYR:0.7340, IDR:0.0001683, PHP:0.04933, ISK:0.02429
+  };
+  var CATS = ["אוכל","לינה","תחבורה","בילוי","קניות","אחר"];
+  var AVCOLORS = ["#0f7a6c","#d99a2b","#4a6fa5","#b85c8a","#c9743a","#5a8f5a","#8a6bb0","#c05555"];
+
+  var rates = Object.assign({}, FALLBACK);
+
+  // ---------- state / storage ----------
+  function load(k, d){ try { var v = localStorage.getItem(k); return v===null?d:JSON.parse(v); } catch(e){ return d; } }
+  function save(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+
+  var store = load("shk_store", null);
+  if (!store){
+    var old = load("shk_expenses", []);
+    var t = newTrip("הטיול שלי");
+    (old||[]).forEach(function(e){ t.expenses.push({ id:e.id, amount:e.amount, code:e.code, desc:e.desc, cat:e.cat, payer:null, split:[] }); });
+    store = { trips:[t], active:t.id, currency: load("shk_cur","USD"), theme: load("shk_theme",null) };
+    persist();
+  }
+  if (!CUR[store.currency]) store.currency = "USD";
+
+  function persist(){ save("shk_store", store); }
+  function newTrip(name){ return { id:"t"+Date.now()+Math.floor(Math.random()*1000), name:name, members:[], expenses:[] }; }
+  function activeTrip(){ return store.trips.filter(function(t){return t.id===store.active;})[0] || store.trips[0]; }
+
+  var draft = { cat:"אוכל", payer:null, split:null };
+
+  // ---------- DOM ----------
+  var $ = function(id){ return document.getElementById(id); };
+  var amtInput=$("amtInput"), descInput=$("descInput"), addBtn=$("addBtn"),
+      curBtn=$("curBtn"), curSym=$("curSym"), curCode=$("curCode"), convHint=$("convHint"),
+      list=$("list"), breakdown=$("breakdown"), catsEl=$("cats"),
+      totalAmt=$("totalAmt"), cntEntries=$("cntEntries"), cntPeople=$("cntPeople"), perHead=$("perHead"),
+      tripName=$("tripName"), tripbar=$("tripbar"), memberChips=$("memberChips"),
+      payerPills=$("payerPills"), splitPills=$("splitPills"), splitConfig=$("splitConfig"), settle=$("settle"),
+      curModalBg=$("curModalBg"), curList=$("curList"), curSearch=$("curSearch"),
+      ratePill=$("ratePill"), rateText=$("rateText");
+
+  // ---------- theme ----------
+  function applyTheme(t){
+    var mode = t || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light");
+    document.documentElement.setAttribute("data-theme", mode);
+  }
+  applyTheme(store.theme);
+  $("themeBtn").onclick = function(){
+    var cur = document.documentElement.getAttribute("data-theme");
+    store.theme = cur === "dark" ? "light":"dark"; applyTheme(store.theme); persist();
+  };
+
+  // ---------- helpers ----------
+  function toILS(a, code){ var r = rates[code]!=null?rates[code]:(FALLBACK[code]||0); return a*r; }
+  function fmt(n){ return n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtCompact(code, a){ var noDec=(code==="JPY"||code==="KRW"||code==="IDR"||code==="HUF"||code==="ISK"); return a.toLocaleString("en-US",{minimumFractionDigits:noDec?0:2,maximumFractionDigits:noDec?0:2}); }
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+  function initials(name){ var p=name.trim().split(/\s+/); return ((p[0]||"")[0]||"?")+((p[1]||"")[0]||""); }
+  function memberById(t,id){ return t.members.filter(function(m){return m.id===id;})[0]; }
+  function avatarColor(t,id){ var i=t.members.map(function(m){return m.id;}).indexOf(id); return AVCOLORS[(i<0?0:i)%AVCOLORS.length]; }
+  function dateLabel(id){ var d=new Date(id),now=new Date(); if(d.toDateString()===now.toDateString()) return "היום "+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}); return d.toLocaleDateString("he-IL",{month:"short",day:"numeric"}); }
+
+  // ---------- odometer total ----------
+  var shown=0, animing=false, animFrom=0, animTarget=0, animStart=0, animDur=650;
+  function setTotal(target){ animFrom=shown; animTarget=target; animStart=performance.now(); if(!animing){ animing=true; requestAnimationFrame(tick);} }
+  function tick(now){ var p=Math.min(1,(now-animStart)/animDur); var e=1-Math.pow(1-p,3); shown=animFrom+(animTarget-animFrom)*e; renderTotalNumber(shown); if(p<1) requestAnimationFrame(tick); else { animing=false; shown=animTarget; renderTotalNumber(shown);} }
+  function renderTotalNumber(v){ var parts=fmt(v).split("."); totalAmt.innerHTML=parts[0]+'<span style="opacity:.55">.'+parts[1]+'</span>'; }
+
+  // ---------- trip bar ----------
+  function renderTripbar(){
+    tripbar.innerHTML="";
+    store.trips.forEach(function(t){
+      var c=document.createElement("button");
+      c.className="trip-chip"+(t.id===store.active?" on":""); c.textContent=t.name;
+      c.onclick=function(){ if(t.id===store.active){ editTrip(t); } else { store.active=t.id; draft.payer=null; draft.split=null; persist(); renderAll(); } };
+      tripbar.appendChild(c);
+    });
+    var add=document.createElement("button"); add.className="trip-chip add"; add.textContent="+ טיול חדש";
+    add.onclick=function(){ promptModal({title:"שם הטיול", value:"", ok:"צור", onOk:function(name){ if(!name)return; var t=newTrip(name); store.trips.push(t); store.active=t.id; draft.payer=null; draft.split=null; persist(); renderAll(); }}); };
+    tripbar.appendChild(add);
+  }
+  function editTrip(t){
+    promptModal({ title:"שינוי שם הטיול", value:t.name, ok:"שמור", showDelete: store.trips.length>1,
+      onOk:function(name){ if(name){ t.name=name; persist(); renderAll(); } },
+      onDelete:function(){ store.trips=store.trips.filter(function(x){return x.id!==t.id;}); if(store.active===t.id) store.active=store.trips[0].id; persist(); renderAll(); }
+    });
+  }
+
+  // ---------- members ----------
+  function renderMembers(){
+    var t=activeTrip();
+    memberChips.innerHTML="";
+    t.members.forEach(function(m){
+      var chip=document.createElement("div"); chip.className="mchip";
+      chip.innerHTML='<span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span>'+esc(m.name)+'<button class="mdel" aria-label="הסר '+esc(m.name)+'">✕</button>';
+      chip.querySelector(".mdel").onclick=function(){ removeMember(m.id); };
+      memberChips.appendChild(chip);
+    });
+    var add=document.createElement("div"); add.className="mchip add-m"; add.textContent="+ הוסף אדם";
+    add.onclick=function(){ promptModal({title:"הוספת אדם", value:"", ok:"הוסף", onOk:function(name){ if(!name)return; t.members.push({id:"m"+Date.now()+Math.floor(Math.random()*1000), name:name}); draft.split=null; persist(); renderAll(); }}); };
+    memberChips.appendChild(add);
+  }
+  function removeMember(id){
+    var t=activeTrip();
+    var used=t.expenses.some(function(e){ return e.payer===id || (e.split&&e.split.indexOf(id)>=0); });
+    if(used && !confirm("האדם הזה חלק מהוצאות קיימות. להסיר אותו בכל זאת? ההוצאות ישמרו על החלוקה המקורית.")) return;
+    t.members=t.members.filter(function(m){return m.id!==id;});
+    if(draft.payer===id) draft.payer=null; draft.split=null; persist(); renderAll();
+  }
+
+  // ---------- paid-by / split config ----------
+  function ensureDraftDefaults(){
+    var t=activeTrip();
+    var ids=t.members.map(function(m){return m.id;});
+    if(draft.payer && ids.indexOf(draft.payer)<0) draft.payer=null;
+    if(!draft.payer && ids.length) draft.payer=ids[0];
+    if(draft.split===null) draft.split = ids.slice();
+    else draft.split = draft.split.filter(function(id){return ids.indexOf(id)>=0;});
+  }
+  function renderSplitConfig(){
+    var t=activeTrip();
+    if(!t.members.length){ splitConfig.style.display="none"; return; }
+    splitConfig.style.display="block";
+    ensureDraftDefaults();
+    payerPills.innerHTML="";
+    t.members.forEach(function(m){
+      var p=document.createElement("button"); p.type="button";
+      p.className="pill"+(draft.payer===m.id?" payer":"");
+      p.innerHTML='<span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span>'+esc(m.name);
+      p.onclick=function(){ draft.payer=m.id; renderSplitConfig(); };
+      payerPills.appendChild(p);
+    });
+    splitPills.innerHTML="";
+    t.members.forEach(function(m){
+      var on=draft.split.indexOf(m.id)>=0;
+      var p=document.createElement("button"); p.type="button";
+      p.className="pill"+(on?" on":" off-split");
+      p.innerHTML='<span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span>'+esc(m.name);
+      p.onclick=function(){ if(on){ draft.split=draft.split.filter(function(x){return x!==m.id;}); } else { draft.split.push(m.id); } renderSplitConfig(); };
+      splitPills.appendChild(p);
+    });
+  }
+  $("splitAllBtn").onclick=function(){ var t=activeTrip(); draft.split=t.members.map(function(m){return m.id;}); renderSplitConfig(); };
+
+  // ---------- categories ----------
+  CATS.forEach(function(cat){
+    var b=document.createElement("button"); b.type="button";
+    b.className="cat"+(cat===draft.cat?" on":""); b.textContent=cat;
+    b.onclick=function(){ draft.cat=cat; catsEl.querySelectorAll(".cat").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); };
+    catsEl.appendChild(b);
+  });
+
+  // ---------- currency ----------
+  function refreshCurBtn(){ var c=CUR[store.currency]; curSym.textContent=c?c.s:""; curCode.textContent=store.currency; updateHint(); }
+  curBtn.onclick=function(){ buildCurList(""); curModalBg.classList.add("open"); setTimeout(function(){curSearch.value="";curSearch.focus();},60); };
+  curModalBg.onclick=function(e){ if(e.target===curModalBg) curModalBg.classList.remove("open"); };
+  function buildCurList(q){
+    q=q.trim().toLowerCase();
+    var keys=Object.keys(CUR).filter(function(code){ if(!q)return true; var c=CUR[code]; return code.toLowerCase().indexOf(q)>=0||c.n.toLowerCase().indexOf(q)>=0||c.s.toLowerCase().indexOf(q)>=0; });
+    keys.sort(function(a,b){ if(a==="ILS")return -1; if(b==="ILS")return 1; return CUR[a].n.localeCompare(CUR[b].n,"he"); });
+    curList.innerHTML="";
+    keys.forEach(function(code,i){
+      var c=CUR[code]; var r=rates[code]!=null?rates[code]:FALLBACK[code];
+      var item=document.createElement("div");
+      item.className="cur-item"+(code===store.currency?" sel":"")+(i===0?" hl":"");
+      item.innerHTML='<span class="ci-code">'+code+'</span><span class="ci-sym">'+c.s+'</span><span class="ci-name">'+c.n+'</span><span class="ci-rate">'+(code==="ILS"?"—":"1 = ₪"+(r>=1?r.toFixed(2):r.toPrecision(2)))+'</span>';
+      item.onclick=function(){ store.currency=code; persist(); refreshCurBtn(); curModalBg.classList.remove("open"); amtInput.focus(); };
+      curList.appendChild(item);
+    });
+  }
+  curSearch.oninput=function(){ buildCurList(curSearch.value); };
+  curSearch.onkeydown=function(e){ if(e.key==="Enter"){var f=curList.querySelector(".cur-item"); if(f)f.click();} if(e.key==="Escape") curModalBg.classList.remove("open"); };
+
+  // ---------- conversion hint ----------
+  function updateHint(){
+    var v=parseFloat(amtInput.value);
+    if(!v||v<=0){ convHint.textContent=""; return; }
+    if(store.currency==="ILS"){ convHint.innerHTML="כבר ב<b>שקלים</b>"; return; }
+    convHint.innerHTML='<span dir="ltr">'+fmtCompact(store.currency,v)+" "+store.currency+" → <b>₪"+fmt(toILS(v,store.currency))+"</b></span>";
+  }
+  amtInput.oninput=function(){ amtInput.value=amtInput.value.replace(/[^0-9.]/g,"").replace(/(\..*)\./g,"$1"); updateHint(); addBtn.disabled=!(parseFloat(amtInput.value)>0); };
+  amtInput.onkeydown=function(e){ if(e.key==="Enter") addExpense(); };
+  descInput.onkeydown=function(e){ if(e.key==="Enter") addExpense(); };
+
+  // ---------- add / remove expense ----------
+  function addExpense(){
+    var v=parseFloat(amtInput.value); if(!(v>0)){ amtInput.focus(); return; }
+    var t=activeTrip();
+    var payer=null, split=[];
+    if(t.members.length){ ensureDraftDefaults(); payer=draft.payer; split=draft.split.slice(); if(!split.length) split=t.members.map(function(m){return m.id;}); }
+    t.expenses.push({ id:Date.now(), amount:v, code:store.currency, desc:descInput.value.trim(), cat:draft.cat, payer:payer, split:split });
+    persist();
+    amtInput.value=""; descInput.value=""; convHint.textContent=""; addBtn.disabled=true;
+    renderAll(); amtInput.focus();
+  }
+  addBtn.onclick=addExpense; addBtn.disabled=true;
+  function removeExpense(id, el){ el.classList.add("removing"); setTimeout(function(){ var t=activeTrip(); t.expenses=t.expenses.filter(function(e){return e.id!==id;}); persist(); renderAll(); },260); }
+  $("clearBtn").onclick=function(){ var t=activeTrip(); if(!t.expenses.length)return; if(confirm("לנקות את כל ההוצאות ב\""+t.name+"\"? לא ניתן לבטל.")){ t.expenses=[]; persist(); renderAll(); } };
+
+  // ---------- balances / settle up ----------
+  function computeBalances(t){
+    var bal={}; t.members.forEach(function(m){ bal[m.id]=0; });
+    t.expenses.forEach(function(e){
+      if(e.payer==null || !e.split || !e.split.length) return;
+      var ils=toILS(e.amount,e.code);
+      if(bal[e.payer]!=null) bal[e.payer]+=ils;
+      var valid=e.split.filter(function(id){return bal[id]!=null;});
+      if(!valid.length) return;
+      var share=ils/valid.length;
+      valid.forEach(function(id){ bal[id]-=share; });
+    });
+    return bal;
+  }
+  function settleUp(bal){
+    var debt=[], cred=[];
+    Object.keys(bal).forEach(function(id){ var v=Math.round(bal[id]*100)/100; if(v<-0.005) debt.push({id:id,v:-v}); else if(v>0.005) cred.push({id:id,v:v}); });
+    debt.sort(function(a,b){return b.v-a.v;}); cred.sort(function(a,b){return b.v-a.v;});
+    var res=[], i=0, j=0;
+    while(i<debt.length && j<cred.length){
+      var pay=Math.min(debt[i].v, cred[j].v);
+      res.push({from:debt[i].id, to:cred[j].id, amt:pay});
+      debt[i].v-=pay; cred[j].v-=pay;
+      if(debt[i].v<0.005) i++; if(cred[j].v<0.005) j++;
+    }
+    return res;
+  }
+  function renderSettle(){
+    var t=activeTrip();
+    if(t.members.length<1 || !t.expenses.some(function(e){return e.payer!=null;})){ settle.innerHTML=""; return; }
+    var bal=computeBalances(t);
+    var transfers=settleUp(bal);
+    var html='<div class="list-head" style="margin:0 4px 12px"><h2>יישוב חשבונות</h2></div><div class="settle-inner">';
+    t.members.forEach(function(m){
+      var v=Math.round((bal[m.id]||0)*100)/100;
+      var cls=v>0.005?"pos":(v<-0.005?"neg":"zero");
+      var label=v>0.005?"מקבל בחזרה":(v<-0.005?"חייב":"מסודר");
+      html+='<div class="bal-row"><div class="bal-name"><span class="avatar" style="background:'+avatarColor(t,m.id)+'">'+esc(initials(m.name))+'</span><span class="who">'+esc(m.name)+'</span></div>'+
+            '<div><div class="bal-net '+cls+'">'+(v>0.005?"+":"")+"₪"+fmt(v)+'</div><div class="bal-sub" style="text-align:left">'+label+'</div></div></div>';
+    });
+    html+='</div>';
+    if(transfers.length){
+      html+='<div class="settle-inner" style="margin-top:10px"><div class="transfers">';
+      transfers.forEach(function(x){
+        var from=memberById(t,x.from), to=memberById(t,x.to);
+        html+='<div class="transfer"><span class="avatar" style="background:'+avatarColor(t,x.from)+'">'+esc(initials(from.name))+'</span>'+
+              '<span class="tname">'+esc(from.name)+'</span><span class="tarrow">משלם ל־</span>'+
+              '<span class="avatar" style="background:'+avatarColor(t,x.to)+'">'+esc(initials(to.name))+'</span><span class="tname">'+esc(to.name)+'</span>'+
+              '<span class="tamt">₪'+fmt(x.amt)+'</span></div>';
+      });
+      html+='</div></div>';
+    } else {
+      html+='<div class="settle-inner" style="margin-top:10px"><div class="settle-done">הכול מסודר — אף אחד לא חייב כלום.</div></div>';
+    }
+    settle.innerHTML=html;
+  }
+
+  // ---------- main render ----------
+  function render(){
+    var t=activeTrip();
+    tripName.textContent=t.name;
+    var total=t.expenses.reduce(function(s,e){return s+toILS(e.amount,e.code);},0);
+    setTotal(total);
+    cntEntries.textContent=t.expenses.length;
+    var headcount=t.members.length||1;
+    cntPeople.textContent=t.members.length;
+    perHead.textContent="₪"+fmt(total/headcount);
+
+    if(!t.expenses.length){
+      list.innerHTML='<div class="empty"><div class="big">₪ 0.00</div><p>עדיין אין כלום על הדלפק. הוסיפו הוצאה למעלה — בכל מטבע, והיא תגיע בשקלים.</p></div>';
+    } else {
+      list.innerHTML="";
+      t.expenses.slice().reverse().forEach(function(e){
+        var el=document.createElement("div"); el.className="expense"; el.dataset.id=e.id;
+        var ils=toILS(e.amount,e.code);
+        var paidTxt="";
+        if(e.payer!=null){ var pm=memberById(t,e.payer); var n=e.split?e.split.length:0; paidTxt='<span class="paid">שולם ע״י '+(pm?esc(pm.name):"—")+(n?' · מתחלק ל־'+n:'')+'</span>'; }
+        el.innerHTML='<div class="ex-badge">'+e.code+'</div>'+
+          '<div class="ex-main"><div class="ex-desc">'+esc(e.desc||(CUR[e.code]?CUR[e.code].n:e.code))+'</div>'+
+          '<div class="ex-meta"><span class="tag">'+esc(e.cat||"אחר")+'</span>'+paidTxt+'<span>'+dateLabel(e.id)+'</span></div></div>'+
+          '<div class="ex-amt"><div class="ex-ils">₪'+fmt(ils)+'</div><div class="ex-orig">'+(CUR[e.code]?CUR[e.code].s:"")+fmtCompact(e.code,e.amount)+' '+e.code+'</div></div>'+
+          '<button class="ex-del" aria-label="הסר">✕</button>';
+        el.querySelector(".ex-del").onclick=function(){ removeExpense(e.id, el); };
+        list.appendChild(el);
+      });
+    }
+
+    var codes={}; t.expenses.forEach(function(e){ codes[e.code]=(codes[e.code]||0)+toILS(e.amount,e.code); });
+    var arr=Object.keys(codes).map(function(c){return {c:c,v:codes[c]};}).sort(function(a,b){return b.v-a.v;});
+    if(!arr.length){ breakdown.innerHTML=""; }
+    else {
+      var max=arr[0].v;
+      var bh='<div class="list-head" style="margin:0 4px 10px"><h2>לפי מטבע</h2></div>';
+      arr.forEach(function(o){ var pct=(o.v/max*100).toFixed(1); bh+='<div class="bd-row"><span class="bd-code">'+o.c+'</span><span class="bd-bar-wrap"><span class="bd-bar" style="width:'+pct+'%"></span></span><span class="bd-val">₪'+fmt(o.v)+'</span></div>'; });
+      breakdown.innerHTML=bh;
+    }
+  }
+
+  function renderAll(){ renderTripbar(); renderMembers(); renderSplitConfig(); render(); renderSettle(); }
+
+  // ---------- prompt modal ----------
+  var promptBg=$("promptModalBg"), promptInput=$("promptInput"), promptTitle=$("promptTitle"),
+      promptOk=$("promptOk"), promptCancel=$("promptCancel"), promptDelete=$("promptDelete");
+  var promptState=null;
+  function promptModal(opts){
+    promptState=opts; promptTitle.textContent=opts.title; promptInput.value=opts.value||"";
+    promptOk.textContent=opts.ok||"שמור";
+    promptDelete.style.display=opts.showDelete?"block":"none";
+    promptBg.classList.add("open"); setTimeout(function(){ promptInput.focus(); promptInput.select(); },60);
+  }
+  function closePrompt(){ promptBg.classList.remove("open"); promptState=null; }
+  promptOk.onclick=function(){ if(promptState&&promptState.onOk) promptState.onOk(promptInput.value.trim()); closePrompt(); };
+  promptCancel.onclick=closePrompt;
+  promptDelete.onclick=function(){ if(promptState&&promptState.onDelete){ if(confirm("למחוק את הטיול הזה ואת כל ההוצאות שלו?")){ promptState.onDelete(); closePrompt(); } } };
+  promptBg.onclick=function(e){ if(e.target===promptBg) closePrompt(); };
+  promptInput.onkeydown=function(e){ if(e.key==="Enter") promptOk.onclick(); if(e.key==="Escape") closePrompt(); };
+
+  // ---------- live rates ----------
+  function fetchRates(){
+    fetch("https://api.frankfurter.app/latest?from=ILS")
+      .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+      .then(function(data){
+        rates.ILS=1;
+        Object.keys(data.rates).forEach(function(code){ if(CUR[code]) rates[code]=1/data.rates[code]; });
+        rateText.textContent="עדכני · "+data.date; ratePill.classList.remove("stale");
+        refreshCurBtn(); renderAll();
+      })
+      .catch(function(){ rateText.textContent="שערים לא מקוונים"; ratePill.classList.add("stale"); });
+  }
+
+  // ---------- boot ----------
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ curModalBg.classList.remove("open"); closePrompt(); } });
+  refreshCurBtn();
+  renderAll();
+  fetchRates();
+
+})();
+</script>
+</body>
+</html>
