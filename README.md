@@ -22,6 +22,7 @@ Your data is stored locally in your browser. Nothing is uploaded to a server.
 - Split a single payment across several payers (e.g. each pays half), with editable amounts
 - Per-person summary: how much each spent, their share, and the net they owe or get back
 - Minimal-transaction settle-up in shekels
+- Share a trip by link or code; importing merges expenses, so two people can keep in sync
 - Category tags, per-currency breakdown, light and dark themes
 
 ## Tech

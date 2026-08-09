@@ -280,6 +280,11 @@
   .foot { text-align: center; margin-top: 34px; font-size: 12px; color: var(--ink-faint); }
   .foot a { color: var(--gold-deep); text-decoration: none; font-weight: 600; }
 
+  .prompt-hint { font-size: 12px; color: var(--ink-faint); margin-top: 8px; line-height: 1.4; }
+  #promptInput.code { direction: ltr; text-align: left; font-family: var(--mono); font-size: 13px; }
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--paper); padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow-lg); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 100; max-width: 88%; text-align: center; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
   @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 </style>
 </head>
@@ -372,9 +377,10 @@
 <!-- PROMPT MODAL (trip / member names) -->
 <div class="modal-bg" id="promptModalBg">
   <div class="modal" role="dialog" aria-label="קלט">
-    <div class="modal-head"><h3 id="promptTitle">הוספה</h3><input id="promptInput" type="text" autocomplete="off" maxlength="40" /></div>
+    <div class="modal-head"><h3 id="promptTitle">הוספה</h3><input id="promptInput" type="text" autocomplete="off" maxlength="40" /><div id="promptHint" class="prompt-hint"></div></div>
     <div class="modal-actions">
       <button id="promptCancel">ביטול</button>
+      <button id="promptShare" style="display:none">שתף</button>
       <button id="promptDelete" class="danger" style="display:none">מחק טיול</button>
       <button id="promptOk" class="primary">שמור</button>
     </div>
@@ -481,10 +487,16 @@
     var add=document.createElement("button"); add.className="trip-chip add"; add.textContent="+ טיול חדש";
     add.onclick=function(){ promptModal({title:"שם הטיול", value:"", ok:"צור", onOk:function(name){ if(!name)return; var t=newTrip(name); store.trips.push(t); store.active=t.id; draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); }}); };
     tripbar.appendChild(add);
+    var imp=document.createElement("button"); imp.className="trip-chip add"; imp.textContent="⇩ ייבוא טיול";
+    imp.onclick=function(){ promptModal({ title:"ייבוא טיול", value:"", ok:"ייבא", code:true, maxlen:400000,
+      placeholder:"הדביקו כאן קישור או קוד שיתוף", hint:"קיבלתם קישור שיתוף? הדביקו אותו כאן כדי להוסיף את הטיול למכשיר. אם הטיול כבר קיים, ההוצאות החדשות יתווספו.",
+      onOk:function(v){ if(!v) return; if(!importTrip(v)) toast("הקוד לא תקין — ודאו שהעתקתם את כל הקישור"); } }); };
+    tripbar.appendChild(imp);
   }
   function editTrip(t){
-    promptModal({ title:"שינוי שם הטיול", value:t.name, ok:"שמור", showDelete: store.trips.length>1,
+    promptModal({ title:"שינוי שם הטיול", value:t.name, ok:"שמור", showDelete: store.trips.length>1, showShare:true,
       onOk:function(name){ if(name){ t.name=name; persist(); renderAll(); } },
+      onShare:function(){ closePrompt(); openShare(t); },
       onDelete:function(){ store.trips=store.trips.filter(function(x){return x.id!==t.id;}); if(store.active===t.id) store.active=store.trips[0].id; persist(); renderAll(); }
     });
   }
@@ -804,21 +816,73 @@
   function renderAll(){ renderTripbar(); renderMembers(); renderSplitConfig(); render(); renderSettle(); }
 
   // ---------- prompt modal ----------
-  var promptBg=$("promptModalBg"), promptInput=$("promptInput"), promptTitle=$("promptTitle"),
-      promptOk=$("promptOk"), promptCancel=$("promptCancel"), promptDelete=$("promptDelete");
+  var promptBg=$("promptModalBg"), promptInput=$("promptInput"), promptTitle=$("promptTitle"), promptHint=$("promptHint"),
+      promptOk=$("promptOk"), promptCancel=$("promptCancel"), promptDelete=$("promptDelete"), promptShare=$("promptShare");
   var promptState=null;
   function promptModal(opts){
     promptState=opts; promptTitle.textContent=opts.title; promptInput.value=opts.value||"";
+    promptInput.placeholder=opts.placeholder||""; promptInput.maxLength=opts.maxlen||40;
+    promptInput.className=opts.code?"code":"";
+    promptHint.textContent=opts.hint||""; promptHint.style.display=opts.hint?"block":"none";
     promptOk.textContent=opts.ok||"שמור";
     promptDelete.style.display=opts.showDelete?"block":"none";
+    promptShare.style.display=opts.showShare?"block":"none";
     promptBg.classList.add("open"); setTimeout(function(){ promptInput.focus(); promptInput.select(); },60);
   }
   function closePrompt(){ promptBg.classList.remove("open"); promptState=null; }
   promptOk.onclick=function(){ if(promptState&&promptState.onOk) promptState.onOk(promptInput.value.trim()); closePrompt(); };
   promptCancel.onclick=closePrompt;
+  promptShare.onclick=function(){ if(promptState&&promptState.onShare) promptState.onShare(); };
   promptDelete.onclick=function(){ if(promptState&&promptState.onDelete){ if(confirm("למחוק את הטיול הזה ואת כל ההוצאות שלו?")){ promptState.onDelete(); closePrompt(); } } };
   promptBg.onclick=function(e){ if(e.target===promptBg) closePrompt(); };
   promptInput.onkeydown=function(e){ if(e.key==="Enter") promptOk.onclick(); if(e.key==="Escape") closePrompt(); };
+
+  // ---------- share / import ----------
+  function b64enc(obj){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }catch(e){ return ""; } }
+  function b64dec(s){ try{ s=String(s).replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="="; return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
+  function tripShareLink(t){ return location.origin+location.pathname+"#t="+b64enc({v:1, trip:t}); }
+  function extractCode(input){ input=String(input).trim(); var m=input.match(/[#?&]t=([^&\s]+)/); return m?m[1]:input; }
+  function validTrip(t){ return t && typeof t.id==="string" && typeof t.name==="string" && Array.isArray(t.members) && Array.isArray(t.expenses); }
+  function mergeTrip(inc){
+    var ex=store.trips.filter(function(t){return t.id===inc.id;})[0];
+    if(!ex){ store.trips.push(inc); return inc; }
+    inc.members.forEach(function(m){ if(!ex.members.some(function(x){return x.id===m.id;})) ex.members.push(m); });
+    inc.expenses.forEach(function(e){ if(!ex.expenses.some(function(x){return x.id===e.id;})) ex.expenses.push(e); });
+    ex.expenses.sort(function(a,b){return a.id-b.id;});
+    if(inc.name && ex.name!==inc.name) ex.name=inc.name;
+    return ex;
+  }
+  function importTrip(input){
+    var data=b64dec(extractCode(input)); var trip=data&&data.trip?data.trip:data;
+    if(!validTrip(trip)) return null;
+    var merged=mergeTrip(trip);
+    store.active=merged.id; draft.payers=null; draft.payAmt=null; draft.split=null;
+    persist(); renderAll(); toast("הטיול \""+merged.name+"\" מוכן");
+    return merged;
+  }
+  function copyText(txt){
+    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt);
+    return new Promise(function(res,rej){ try{ var ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); res(); }catch(e){ rej(e); } });
+  }
+  function openShare(t){
+    var link=tripShareLink(t);
+    promptModal({ title:"שתף את \""+esc(t.name)+"\"", value:link, ok:"העתק קישור", code:true, maxlen:400000,
+      hint:"שלחו את הקישור הזה לנוגה. פתיחתו במכשיר שלה תוסיף את הטיול. חִזרו על השיתוף כדי לסנכרן הוצאות חדשות (בשני הכיוונים).",
+      onOk:function(){ copyText(link).then(function(){ toast("הקישור הועתק — שלחו אותו לנוגה"); }).catch(function(){ toast("בחרו והעתיקו את הקישור ידנית"); }); } });
+  }
+  var toastEl=null, toastT=null;
+  function toast(msg){
+    if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl); }
+    toastEl.textContent=msg; toastEl.classList.add("show");
+    clearTimeout(toastT); toastT=setTimeout(function(){ toastEl.classList.remove("show"); }, 2800);
+  }
+  function checkHashImport(){
+    var m=(location.hash||"").match(/[#&]t=([^&]+)/); if(!m) return;
+    var code=m[1];
+    try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){ location.hash=""; }
+    var data=b64dec(code); var trip=data&&data.trip?data.trip:data;
+    if(validTrip(trip) && confirm("לייבא את הטיול \""+trip.name+"\" למכשיר הזה?")) importTrip(code);
+  }
 
   // ---------- live rates ----------
   function fetchRates(){
@@ -837,6 +901,7 @@
   document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ curModalBg.classList.remove("open"); closePrompt(); } });
   refreshCurBtn();
   renderAll();
+  checkHashImport();
   fetchRates();
 
 })();
