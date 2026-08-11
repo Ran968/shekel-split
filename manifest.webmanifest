@@ -1,6 +1,6 @@
 {
-  "name": "Shékel — דלפק ההמרה",
-  "short_name": "Shékel",
+  "name": "SplitS — דלפק ההמרה",
+  "short_name": "SplitS",
   "description": "מעקב הוצאות טיול בכל מטבע — הכול מתאזן בשקלים.",
   "start_url": "./index.html",
   "scope": "./",

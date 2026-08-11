@@ -1,4 +1,4 @@
-# Shékel — the exchange counter
+# SplitS — the exchange counter
 
 A simple, ad-free trip expense splitter. Add an expense in any of 30+ currencies and it is
 always totalled in Israeli shekels (ILS). Create trips, add the people on each, mark who paid

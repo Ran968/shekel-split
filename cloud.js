@@ -40,6 +40,9 @@ if (configured) {
 function isStandalonePWA() {
   return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 }
+function isMobileBrowser() {
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+}
 
 window.ShkCloud = {
   configured: configured,
@@ -54,8 +57,8 @@ window.ShkCloud = {
   signIn: function () {
     if (!configured) return Promise.reject(new Error("not-configured"));
     var provider = new GoogleAuthProvider();
-    // Popups are unreliable inside an installed/standalone PWA on some platforms; use redirect there.
-    if (isStandalonePWA()) return signInWithRedirect(auth, provider);
+    // Popups are unreliable on mobile browsers in general (not just installed PWAs) — redirect there.
+    if (isStandalonePWA() || isMobileBrowser()) return signInWithRedirect(auth, provider);
     return signInWithPopup(auth, provider).catch(function (err) {
       if (err && (err.code === "auth/popup-blocked" || err.code === "auth/cancelled-popup-request")) {
         return signInWithRedirect(auth, provider);
