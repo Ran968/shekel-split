@@ -18,6 +18,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Shékel" />
+
+<!-- cloud sync (Google sign-in + Firestore) -->
+<script src="firebase-config.js"></script>
+<script type="module" src="cloud.js"></script>
 <style>
   :root {
     --paper: #f3efe6;
@@ -300,6 +304,47 @@
   .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--paper); padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow-lg); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 100; max-width: 88%; text-align: center; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* ---------- account: sign-in button, avatar, menu ---------- */
+  .signin-btn { width: auto; padding: 0 14px 0 10px; gap: 7px; display: flex; }
+  .signin-btn svg { flex-shrink: 0; }
+  .signin-btn::after { content: "התחברות"; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  .avatar-btn {
+    width: 40px; height: 40px; border-radius: 50%; padding: 0; border: 1px solid var(--line);
+    cursor: pointer; overflow: hidden; box-shadow: var(--shadow); background: var(--card); flex-shrink: 0;
+  }
+  .avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .account-menu {
+    position: fixed; inset: 0; background: rgba(16,22,29,.4); backdrop-filter: blur(3px);
+    display: none; z-index: 60; align-items: flex-start; justify-content: center;
+  }
+  .account-menu.open { display: flex; animation: fade .15s ease; }
+  .account-card {
+    margin-top: 78px; width: 260px; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: var(--shadow-lg); padding: 16px; animation: up .2s cubic-bezier(.2,.85,.25,1);
+  }
+  .account-card .ac-user { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .account-card .ac-user img { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+  .account-card .ac-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .account-card .ac-email { font-size: 12px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .account-card .ac-status { font-size: 12px; color: var(--teal); font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .account-card .ac-status .led { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+  .account-card button { width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--paper); color: var(--coral); font-weight: 700; font-size: 14px; cursor: pointer; }
+
+  /* ---------- first-visit sign-in gate ---------- */
+  .gate-bg {
+    position: fixed; inset: 0; background: var(--paper); z-index: 80;
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  .gate-bg.open { display: flex; }
+  .gate-card { max-width: 400px; width: 100%; text-align: center; }
+  .gate-card .gate-mark { font-family: var(--mono); font-size: 54px; font-weight: 800; color: var(--gold); margin-bottom: 6px; }
+  .gate-card h2 { font-size: 22px; font-weight: 800; margin-bottom: 10px; text-wrap: balance; }
+  .gate-card p { font-size: 14px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 26px; }
+  .gate-signin { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1.5px solid var(--line); background: var(--card); border-radius: 13px; padding: 14px; font-size: 15px; font-weight: 700; color: var(--ink); cursor: pointer; box-shadow: var(--shadow); transition: transform .12s, border-color .2s; }
+  .gate-signin:hover { transform: translateY(-1px); border-color: var(--gold); }
+  .gate-skip { margin-top: 14px; background: none; border: none; color: var(--ink-faint); font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px; }
+  .gate-skip:hover { color: var(--ink-soft); }
+
   @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 </style>
 </head>
@@ -313,6 +358,10 @@
     </div>
     <div class="header-btns">
       <button class="toolbtn" id="installBtn" title="התקנת האפליקציה" aria-label="התקנת האפליקציה" style="display:none">⭳</button>
+      <button class="toolbtn signin-btn" id="signInBtn" title="התחברות עם Google" aria-label="התחברות עם Google" style="display:none">
+        <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97l2.97 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      </button>
+      <button class="avatar-btn" id="userBtn" style="display:none"><img id="userAvatar" alt="" /></button>
       <button class="toolbtn" id="themeBtn" title="מצב בהיר / כהה" aria-label="החלפת ערכת נושא">◐</button>
     </div>
   </header>
@@ -405,6 +454,29 @@
   </div>
 </div>
 
+<!-- ACCOUNT MENU -->
+<div class="account-menu" id="accountMenu">
+  <div class="account-card">
+    <div class="ac-user"><img id="acAvatar" alt="" /><div><div class="ac-name" id="acName"></div><div class="ac-email" id="acEmail"></div></div></div>
+    <div class="ac-status"><span class="led"></span><span>הטיולים מסתנכרנים אוטומטית</span></div>
+    <button id="signOutBtn">התנתקות</button>
+  </div>
+</div>
+
+<!-- FIRST-VISIT SIGN-IN GATE -->
+<div class="gate-bg" id="gateBg">
+  <div class="gate-card" dir="ltr">
+    <div class="gate-mark">₪</div>
+    <h2>Welcome to Shékel</h2>
+    <p>Sign in with Google so your trips update automatically across your devices and whoever you share them with — no more re-sending links.</p>
+    <button class="gate-signin" id="gateSignIn">
+      <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97l2.97 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      <span>Continue with Google</span>
+    </button>
+    <button class="gate-skip" id="gateSkip">Continue without an account</button>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -450,7 +522,14 @@
   if (!CUR[store.currency]) store.currency = "USD";
 
   function persist(){ save("shk_store", store); }
-  function newTrip(name){ return { id:"t"+Date.now()+Math.floor(Math.random()*1000), name:name, members:[], expenses:[] }; }
+  function randId(prefix){
+    var bytes = new Uint8Array(10);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+    else for (var i=0;i<bytes.length;i++) bytes[i]=Math.floor(Math.random()*256);
+    var hex=""; for (var j=0;j<bytes.length;j++) hex += bytes[j].toString(16).padStart(2,"0");
+    return prefix+hex;
+  }
+  function newTrip(name){ return { id:randId("t"), name:name, members:[], expenses:[], cloud:false }; }
   function activeTrip(){ return store.trips.filter(function(t){return t.id===store.active;})[0] || store.trips[0]; }
 
   var draft = { cat:"אוכל", payers:null, payAmt:null, split:null };
@@ -498,12 +577,12 @@
     tripbar.innerHTML="";
     store.trips.forEach(function(t){
       var c=document.createElement("button");
-      c.className="trip-chip"+(t.id===store.active?" on":""); c.textContent=t.name;
+      c.className="trip-chip"+(t.id===store.active?" on":""); c.textContent=t.name+(t.cloud?" ⟳":"");
       c.onclick=function(){ if(t.id===store.active){ editTrip(t); } else { store.active=t.id; draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); } };
       tripbar.appendChild(c);
     });
     var add=document.createElement("button"); add.className="trip-chip add"; add.textContent="+ טיול חדש";
-    add.onclick=function(){ promptModal({title:"שם הטיול", value:"", ok:"צור", onOk:function(name){ if(!name)return; var t=newTrip(name); store.trips.push(t); store.active=t.id; draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); }}); };
+    add.onclick=function(){ promptModal({title:"שם הטיול", value:"", ok:"צור", onOk:function(name){ if(!name)return; var t=newTrip(name); store.trips.push(t); store.active=t.id; draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); enableCloudForTrip(t); }}); };
     tripbar.appendChild(add);
     var imp=document.createElement("button"); imp.className="trip-chip add"; imp.textContent="⇩ ייבוא טיול";
     imp.onclick=function(){ promptModal({ title:"ייבוא טיול", value:"", ok:"ייבא", code:true, maxlen:400000,
@@ -513,9 +592,9 @@
   }
   function editTrip(t){
     promptModal({ title:"שינוי שם הטיול", value:t.name, ok:"שמור", showDelete: store.trips.length>1, showShare:true,
-      onOk:function(name){ if(name){ t.name=name; persist(); renderAll(); } },
+      onOk:function(name){ if(name){ t.name=name; persist(); renderAll(); syncActiveTripIfCloud(); } },
       onShare:function(){ closePrompt(); openShare(t); },
-      onDelete:function(){ store.trips=store.trips.filter(function(x){return x.id!==t.id;}); if(store.active===t.id) store.active=store.trips[0].id; persist(); renderAll(); }
+      onDelete:function(){ unsubscribeCloudTrip(t.id); store.trips=store.trips.filter(function(x){return x.id!==t.id;}); if(store.active===t.id) store.active=store.trips[0].id; persist(); renderAll(); }
     });
   }
 
@@ -530,7 +609,7 @@
       memberChips.appendChild(chip);
     });
     var add=document.createElement("div"); add.className="mchip add-m"; add.textContent="+ הוסף אדם";
-    add.onclick=function(){ promptModal({title:"הוספת אדם", value:"", ok:"הוסף", onOk:function(name){ if(!name)return; t.members.push({id:"m"+Date.now()+Math.floor(Math.random()*1000), name:name}); draft.split=null; persist(); renderAll(); }}); };
+    add.onclick=function(){ promptModal({title:"הוספת אדם", value:"", ok:"הוסף", onOk:function(name){ if(!name)return; t.members.push({id:"m"+Date.now()+Math.floor(Math.random()*1000), name:name}); draft.split=null; persist(); renderAll(); syncActiveTripIfCloud(); }}); };
     memberChips.appendChild(add);
   }
   function removeMember(id){
@@ -538,7 +617,7 @@
     var used=t.expenses.some(function(e){ return payersOf(e).some(function(p){return p.id===id;}) || (e.split&&e.split.indexOf(id)>=0); });
     if(used && !confirm("האדם הזה חלק מהוצאות קיימות. להסיר אותו בכל זאת? ההוצאות ישמרו על החלוקה המקורית.")) return;
     t.members=t.members.filter(function(m){return m.id!==id;});
-    draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll();
+    draft.payers=null; draft.payAmt=null; draft.split=null; persist(); renderAll(); syncActiveTripIfCloud();
   }
 
   // ---------- paid-by / split config ----------
@@ -717,11 +796,11 @@
     t.expenses.push({ id:Date.now(), amount:v, code:store.currency, desc:descInput.value.trim(), cat:draft.cat, payers:payers, split:split });
     persist();
     amtInput.value=""; descInput.value=""; convHint.textContent=""; addBtn.disabled=true; draft.payAmt=null;
-    renderAll(); amtInput.focus();
+    renderAll(); amtInput.focus(); syncActiveTripIfCloud();
   }
   addBtn.onclick=addExpense; addBtn.disabled=true;
-  function removeExpense(id, el){ el.classList.add("removing"); setTimeout(function(){ var t=activeTrip(); t.expenses=t.expenses.filter(function(e){return e.id!==id;}); persist(); renderAll(); },260); }
-  $("clearBtn").onclick=function(){ var t=activeTrip(); if(!t.expenses.length)return; if(confirm("לנקות את כל ההוצאות ב\""+t.name+"\"? לא ניתן לבטל.")){ t.expenses=[]; persist(); renderAll(); } };
+  function removeExpense(id, el){ el.classList.add("removing"); setTimeout(function(){ var t=activeTrip(); t.expenses=t.expenses.filter(function(e){return e.id!==id;}); persist(); renderAll(); syncActiveTripIfCloud(); },260); }
+  $("clearBtn").onclick=function(){ var t=activeTrip(); if(!t.expenses.length)return; if(confirm("לנקות את כל ההוצאות ב\""+t.name+"\"? לא ניתן לבטל.")){ t.expenses=[]; persist(); renderAll(); syncActiveTripIfCloud(); } };
 
   // ---------- balances / settle up ----------
   function computeSummary(t){
@@ -858,7 +937,10 @@
   // ---------- share / import ----------
   function b64enc(obj){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }catch(e){ return ""; } }
   function b64dec(s){ try{ s=String(s).replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="="; return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
-  function tripShareLink(t){ return location.origin+location.pathname+"#t="+b64enc({v:1, trip:t}); }
+  function tripShareLink(t){
+    if(t.cloud) return location.origin+location.pathname+"#j="+t.id;
+    return location.origin+location.pathname+"#t="+b64enc({v:1, trip:t});
+  }
   function extractCode(input){ input=String(input).trim(); var m=input.match(/[#?&]t=([^&\s]+)/); return m?m[1]:input; }
   function validTrip(t){ return t && typeof t.id==="string" && typeof t.name==="string" && Array.isArray(t.members) && Array.isArray(t.expenses); }
   function mergeTrip(inc){
@@ -876,6 +958,7 @@
     var merged=mergeTrip(trip);
     store.active=merged.id; draft.payers=null; draft.payAmt=null; draft.split=null;
     persist(); renderAll(); toast("הטיול \""+merged.name+"\" מוכן");
+    if(merged.cloud){ subscribeCloudTrip(merged.id); pushTripToCloud(merged); } else { enableCloudForTrip(merged); }
     return merged;
   }
   function copyText(txt){
@@ -884,8 +967,11 @@
   }
   function openShare(t){
     var link=tripShareLink(t);
+    var hint = t.cloud
+      ? "שלחו את הקישור הזה לנוגה. אחרי שהיא מתחברת עם Google ופותחת אותו, הטיול יתעדכן אצל שניכם אוטומטית — בלי צורך לשתף שוב."
+      : "שלחו את הקישור הזה לנוגה. פתיחתו במכשיר שלה תוסיף את הטיול. חִזרו על השיתוף כדי לסנכרן הוצאות חדשות (בשני הכיוונים).";
     promptModal({ title:"שתף את \""+esc(t.name)+"\"", value:link, ok:"העתק קישור", code:true, maxlen:400000,
-      hint:"שלחו את הקישור הזה לנוגה. פתיחתו במכשיר שלה תוסיף את הטיול. חִזרו על השיתוף כדי לסנכרן הוצאות חדשות (בשני הכיוונים).",
+      hint:hint,
       onOk:function(){ copyText(link).then(function(){ toast("הקישור הועתק — שלחו אותו לנוגה"); }).catch(function(){ toast("בחרו והעתיקו את הקישור ידנית"); }); } });
   }
   var toastEl=null, toastT=null;
@@ -894,12 +980,115 @@
     toastEl.textContent=msg; toastEl.classList.add("show");
     clearTimeout(toastT); toastT=setTimeout(function(){ toastEl.classList.remove("show"); }, 2800);
   }
+  var pendingJoin=null;
   function checkHashImport(){
-    var m=(location.hash||"").match(/[#&]t=([^&]+)/); if(!m) return;
+    var hash=location.hash||"";
+    var jm=hash.match(/[#&]j=([^&]+)/);
+    if(jm){
+      pendingJoin=jm[1];
+      try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){ location.hash=""; }
+      return;
+    }
+    var m=hash.match(/[#&]t=([^&]+)/); if(!m) return;
     var code=m[1];
     try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){ location.hash=""; }
     var data=b64dec(code); var trip=data&&data.trip?data.trip:data;
     if(validTrip(trip) && confirm("לייבא את הטיול \""+trip.name+"\" למכשיר הזה?")) importTrip(code);
+  }
+
+  // ---------- cloud sync (Google sign-in + Firestore) ----------
+  var cloudUnsub={}, applyingRemoteUpdate=false;
+  function stripLocalFields(t){ return { id:t.id, name:t.name, members:t.members, expenses:t.expenses }; }
+  function pushTripToCloud(t){
+    if(!window.ShkCloud || !ShkCloud.configured || !ShkCloud.currentUser()) return;
+    ShkCloud.pushTrip(stripLocalFields(t)).catch(function(){});
+  }
+  function syncActiveTripIfCloud(){
+    if(applyingRemoteUpdate) return;
+    var t=activeTrip(); if(t && t.cloud) pushTripToCloud(t);
+  }
+  function subscribeCloudTrip(tripId){
+    if(!window.ShkCloud || !ShkCloud.configured || cloudUnsub[tripId]) return;
+    cloudUnsub[tripId]=ShkCloud.subscribeTrip(tripId, function(remote){
+      if(!validTrip(remote)) return;
+      applyingRemoteUpdate=true;
+      try{
+        var incoming=Object.assign({}, remote, {id:tripId, cloud:true});
+        var merged=mergeTrip(incoming);
+        if(!store.trips.some(function(x){return x.id===store.active;})) store.active=merged.id;
+        persist(); renderAll();
+      } finally { applyingRemoteUpdate=false; }
+    });
+  }
+  function unsubscribeCloudTrip(tripId){ if(cloudUnsub[tripId]){ cloudUnsub[tripId](); delete cloudUnsub[tripId]; } }
+  function unsubscribeAllCloud(){ Object.keys(cloudUnsub).forEach(unsubscribeCloudTrip); }
+  function enableCloudForTrip(t){
+    if(!window.ShkCloud || !ShkCloud.configured || !ShkCloud.currentUser()) return;
+    if(t.cloud){ subscribeCloudTrip(t.id); return; }
+    t.cloud=true; persist();
+    pushTripToCloud(t); subscribeCloudTrip(t.id);
+  }
+  function migrateLocalTripsToCloud(){ store.trips.forEach(function(t){ if(t.cloud) subscribeCloudTrip(t.id); else enableCloudForTrip(t); }); }
+  function joinCloudTrip(tripId){
+    if(!window.ShkCloud || !ShkCloud.configured){ toast("הסנכרון בענן עדיין לא הוגדר"); return; }
+    if(!ShkCloud.currentUser()){ pendingJoin=tripId; openGate("Sign in with Google to join the shared trip."); return; }
+    ShkCloud.getTrip(tripId).then(function(data){
+      if(!data){ toast("הטיול לא נמצא — ייתכן שהקישור שגוי"); return; }
+      var incoming=Object.assign({}, data, {id:tripId, cloud:true});
+      if(!validTrip(incoming)){ toast("נתוני הטיול פגומים"); return; }
+      var merged=mergeTrip(incoming);
+      store.active=merged.id; persist(); renderAll();
+      subscribeCloudTrip(tripId);
+      toast("הטיול \""+merged.name+"\" מוכן");
+    }).catch(function(){ toast("שגיאה בטעינת הטיול — נסו שוב"); });
+  }
+
+  // ---------- account UI: sign-in gate, header button, avatar menu ----------
+  var gateBg=$("gateBg"), gateSignIn=$("gateSignIn"), gateSkip=$("gateSkip"),
+      signInBtn=$("signInBtn"), userBtn=$("userBtn"), userAvatar=$("userAvatar"),
+      accountMenu=$("accountMenu"), acAvatar=$("acAvatar"), acName=$("acName"), acEmail=$("acEmail"), signOutBtn=$("signOutBtn");
+  var gateDefaultMsg=gateBg.querySelector(".gate-card p").textContent;
+  function openGate(customMsg){
+    gateBg.querySelector(".gate-card p").textContent = customMsg || gateDefaultMsg;
+    gateBg.classList.add("open");
+  }
+  function closeGate(){ gateBg.classList.remove("open"); }
+  gateSignIn.onclick=function(){ if(window.ShkCloud && ShkCloud.configured) ShkCloud.signIn().catch(function(){ toast("ההתחברות נכשלה — נסו שוב"); }); else toast("הסנכרון בענן עדיין לא הוגדר"); };
+  gateSkip.onclick=function(){ save("shk_seen_gate", true); pendingJoin=null; closeGate(); };
+  signInBtn.onclick=function(){ if(window.ShkCloud && ShkCloud.configured) ShkCloud.signIn().catch(function(){ toast("ההתחברות נכשלה — נסו שוב"); }); else toast("הסנכרון בענן עדיין לא הוגדר"); };
+  userBtn.onclick=function(){
+    accountMenu.classList.add("open");
+    var u=window.ShkCloud&&ShkCloud.currentUser();
+    if(u){ acAvatar.src=u.photoURL||""; acName.textContent=u.displayName||""; acEmail.textContent=u.email||""; }
+  };
+  accountMenu.onclick=function(e){ if(e.target===accountMenu) accountMenu.classList.remove("open"); };
+  signOutBtn.onclick=function(){
+    unsubscribeAllCloud();
+    if(window.ShkCloud) ShkCloud.signOut();
+    accountMenu.classList.remove("open");
+    toast("התנתקת — הטיולים נשארים במכשיר");
+  };
+
+  function onCloudAuthChange(user){
+    if(user){
+      signInBtn.style.display="none"; userBtn.style.display="block"; userAvatar.src=user.photoURL||"";
+      closeGate(); save("shk_seen_gate", true);
+      migrateLocalTripsToCloud();
+      if(pendingJoin){ var pj=pendingJoin; pendingJoin=null; joinCloudTrip(pj); }
+    } else {
+      signInBtn.style.display = (window.ShkCloud && ShkCloud.configured) ? "grid" : "none";
+      userBtn.style.display="none";
+      unsubscribeAllCloud();
+      if(pendingJoin) openGate("Sign in with Google to join the shared trip.");
+      else if(!load("shk_seen_gate", false)) openGate();
+    }
+  }
+  function initCloudUI(){
+    if(!window.ShkCloud || !ShkCloud.configured){
+      signInBtn.style.display="none";
+      return;
+    }
+    ShkCloud.onAuth(onCloudAuthChange);
   }
 
   // ---------- live rates ----------
@@ -944,6 +1133,7 @@
   refreshCurBtn();
   renderAll();
   checkHashImport();
+  if(window.ShkCloud) initCloudUI(); else window.addEventListener("shkcloud-ready", initCloudUI, {once:true});
   fetchRates();
 
 })();

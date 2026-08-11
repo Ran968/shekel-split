@@ -1,9 +1,11 @@
 // Bump CACHE on every deploy that changes app-shell files, so clients pick up the update.
-var CACHE = "shekel-v3";
+var CACHE = "shekel-v4";
 var SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
+  "./firebase-config.js",
+  "./cloud.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-512-maskable.png",
