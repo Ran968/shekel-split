@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
   getAuth, GoogleAuthProvider, signInWithRedirect, signInWithPopup,
-  getRedirectResult, onAuthStateChanged, signOut
+  getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp
@@ -33,15 +33,9 @@ function notifyAuth(user) {
 }
 
 if (configured) {
+  setPersistence(auth, browserLocalPersistence).catch(function () {});
   getRedirectResult(auth).catch(function () {});
   onAuthStateChanged(auth, function (user) { notifyAuth(user); });
-}
-
-function isStandalonePWA() {
-  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-}
-function isMobileBrowser() {
-  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 window.ShkCloud = {
@@ -57,10 +51,12 @@ window.ShkCloud = {
   signIn: function () {
     if (!configured) return Promise.reject(new Error("not-configured"));
     var provider = new GoogleAuthProvider();
-    // Popups are unreliable on mobile browsers in general (not just installed PWAs) — redirect there.
-    if (isStandalonePWA() || isMobileBrowser()) return signInWithRedirect(auth, provider);
+    // Popup avoids the cross-origin (firebaseapp.com) redirect round-trip, which some mobile
+    // browsers (notably Safari with tracking protection) fail to persist — causing a sign-in loop.
+    // Only fall back to redirect if the platform truly can't open a popup.
     return signInWithPopup(auth, provider).catch(function (err) {
-      if (err && (err.code === "auth/popup-blocked" || err.code === "auth/cancelled-popup-request")) {
+      var code = err && err.code;
+      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment") {
         return signInWithRedirect(auth, provider);
       }
       throw err;
