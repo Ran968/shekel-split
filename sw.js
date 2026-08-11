@@ -1,5 +1,5 @@
 // Bump CACHE on every deploy that changes app-shell files, so clients pick up the update.
-var CACHE = "shekel-v8";
+var CACHE = "shekel-v9";
 var SHELL = [
   "./",
   "./index.html",
