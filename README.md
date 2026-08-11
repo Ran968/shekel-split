@@ -14,6 +14,13 @@ Open the hosted page on your phone or computer:
 
 Your data is stored locally in your browser. Nothing is uploaded to a server.
 
+### Install it as an app
+
+- **Android / Chrome / Edge:** open the link, then tap the install icon in the address bar (or the in-app "install" button) → **Install**.
+- **iPhone / iPad (Safari):** open the link, tap the **Share** button, then **Add to Home Screen**.
+
+It launches full-screen with its own icon, and the app shell works offline once installed.
+
 ## Features
 
 - Convert any currency to ILS using live daily rates (Frankfurter API), with an offline fallback

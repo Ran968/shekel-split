@@ -2,11 +2,22 @@
 <html lang="he" dir="rtl" data-theme="light">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <title>שקל — דלפק ההמרה</title>
+
+<!-- installable app: manifest + icons -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icons/favicon.ico" sizes="any" />
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="theme-color" content="#141d27" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Shékel" />
 <style>
   :root {
     --paper: #f3efe6;
@@ -65,7 +76,10 @@
   }
   ::selection { background: var(--gold); color: #16202b; }
 
-  .wrap { max-width: 760px; margin: 0 auto; padding: 22px 18px 90px; }
+  .wrap {
+    max-width: 760px; margin: 0 auto;
+    padding: calc(22px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(90px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+  }
 
   /* ---------- header ---------- */
   header {
@@ -79,6 +93,7 @@
     font-size: 12px; letter-spacing: .06em;
     color: var(--ink-faint); font-weight: 600;
   }
+  .header-btns { display: flex; align-items: center; gap: 8px; }
   .toolbtn {
     appearance: none; border: 1px solid var(--line); background: var(--card);
     color: var(--ink-soft); width: 40px; height: 40px; border-radius: 11px;
@@ -296,7 +311,10 @@
       <h1>Shékel<span class="dot">.</span></h1>
       <small>דלפק ההמרה</small>
     </div>
-    <button class="toolbtn" id="themeBtn" title="מצב בהיר / כהה" aria-label="החלפת ערכת נושא">◐</button>
+    <div class="header-btns">
+      <button class="toolbtn" id="installBtn" title="התקנת האפליקציה" aria-label="התקנת האפליקציה" style="display:none">⭳</button>
+      <button class="toolbtn" id="themeBtn" title="מצב בהיר / כהה" aria-label="החלפת ערכת נושא">◐</button>
+    </div>
   </header>
 
   <div class="tripbar" id="tripbar"></div>
@@ -896,6 +914,30 @@
       })
       .catch(function(){ rateText.textContent="שערים לא מקוונים"; ratePill.classList.add("stale"); });
   }
+
+  // ---------- installable app ----------
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+  function isStandalone(){
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+  var installBtn=$("installBtn"), deferredInstall=null;
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault(); deferredInstall=e;
+    if(!isStandalone()) installBtn.style.display="grid";
+  });
+  window.addEventListener("appinstalled", function(){ installBtn.style.display="none"; deferredInstall=null; });
+  installBtn.onclick=function(){
+    if(deferredInstall){ deferredInstall.prompt(); deferredInstall.userChoice.then(function(){ deferredInstall=null; }); return; }
+    var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isIOS) toast("להתקנה: הקישו על כפתור השיתוף ⬆︎ ואז \"הוספה למסך הבית\"");
+    else toast("להתקנה: פתחו את תפריט הדפדפן ובחרו \"התקנת אפליקציה\"");
+  };
+  (function(){
+    var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isIOS && !isStandalone()) installBtn.style.display="grid";
+  })();
 
   // ---------- boot ----------
   document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ curModalBg.classList.remove("open"); closePrompt(); } });
